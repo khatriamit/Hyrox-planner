@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hyrox Race Planner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            hyrox: { yellow: '#F5E600', dark: '#1A1A1A', gray: '#2D2D2D', light: '#F5F5F5' }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .tab-active { color: #F5E600; border-bottom: 2px solid #F5E600; }
+    .station-card { transition: transform 0.15s ease; }
+    .station-card:hover { transform: translateY(-2px); }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: #F5E600; cursor: pointer;
+    }
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      height: 6px; border-radius: 3px; background: #444; outline: none;
+      width: 100%;
+    }
+    .bar-fill { transition: width 0.4s ease; }
+    .ring { transition: stroke-dashoffset 0.5s ease; }
+    input[type="number"] {
+      -moz-appearance: textfield;
+    }
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none; margin: 0;
+    }
+  </style>
+</head>
+<body class="bg-hyrox-dark text-white min-h-screen pb-20">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-50 bg-hyrox-dark/95 backdrop-blur border-b border-hyrox-gray">
+    <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 bg-hyrox-yellow rounded-lg flex items-center justify-center">
+          <span class="text-hyrox-dark font-extrabold text-sm">H</span>
+        </div>
+        <h1 class="font-bold text-lg">Hyrox Planner</h1>
+      </div>
+      <button onclick="resetAll()" class="text-xs text-gray-400 hover:text-white bg-hyrox-gray px-2.5 py-1 rounded-full">Reset</button>
+    </div>
+  </header>
+
+  <!-- Tab Navigation -->
+  <nav class="sticky top-[57px] z-40 bg-hyrox-dark/95 backdrop-blur border-b border-hyrox-gray">
+    <div class="max-w-lg mx-auto px-4 flex text-sm font-medium overflow-x-auto">
+      <button onclick="showTab('import')" id="tab-import" class="py-3 px-3 whitespace-nowrap tab-active">Import PB</button>
+      <button onclick="showTab('setup')" id="tab-setup" class="py-3 px-3 whitespace-nowrap text-gray-400">My Race</button>
+      <button onclick="showTab('stations')" id="tab-stations" class="py-3 px-3 whitespace-nowrap text-gray-400">Stations</button>
+      <button onclick="showTab('analysis')" id="tab-analysis" class="py-3 px-3 whitespace-nowrap text-gray-400">Analysis</button>
+      <button onclick="showTab('train')" id="tab-train" class="py-3 px-3 whitespace-nowrap text-gray-400">Train</button>
+      <button onclick="showTab('raceday')" id="tab-raceday" class="py-3 px-3 whitespace-nowrap text-gray-400">Race Day</button>
+    </div>
+  </nav>
+
+  <main class="max-w-lg mx-auto px-4 py-6">
+
+    <!-- ==================== IMPORT PB TAB ==================== -->
+    <section id="section-import">
+      <div class="bg-gradient-to-br from-hyrox-gray to-hyrox-dark border border-hyrox-gray rounded-2xl p-6 mb-5">
+        <span class="text-hyrox-yellow text-xs font-semibold uppercase tracking-wider">Step 1</span>
+        <h2 class="text-2xl font-extrabold mt-2">Import Your PB</h2>
+        <p class="text-gray-400 text-sm mt-1">Search your name to pull your Hyrox race results and set your personal best as baseline.</p>
+      </div>
+
+      <!-- Search Form -->
+      <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-5 mb-4">
+        <label class="text-sm font-semibold block mb-3">Search Athlete</label>
+        <div class="flex gap-2 mb-3">
+          <input type="text" id="search-first" placeholder="First name"
+            class="flex-1 h-11 bg-hyrox-dark border border-hyrox-gray rounded-lg px-3 text-sm text-white placeholder-gray-500 focus:border-hyrox-yellow outline-none" />
+          <input type="text" id="search-last" placeholder="Last name"
+            class="flex-1 h-11 bg-hyrox-dark border border-hyrox-gray rounded-lg px-3 text-sm text-white placeholder-gray-500 focus:border-hyrox-yellow outline-none" />
+        </div>
+
+        <!-- Filters Toggle -->
+        <button onclick="toggleFilters()" id="filters-toggle"
+          class="flex items-center gap-1.5 text-xs text-gray-400 hover:text-hyrox-yellow mb-3 transition-colors">
+          <svg id="filters-chevron" class="w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+          Filters (Race, Gender, Age Group)
+        </button>
+
+        <!-- Collapsible Filters -->
+        <div id="filters-panel" class="hidden space-y-3 mb-4">
+          <!-- Race / City -->
+          <div>
+            <label class="text-xs text-gray-400 block mb-1">Race (City)</label>
+            <select id="filter-city" onchange="onCityChange()"
+              class="w-full h-10 bg-hyrox-dark border border-hyrox-gray rounded-lg px-3 text-sm text-white appearance-none focus:border-hyrox-yellow outline-none">
+              <option value="">All Time Ranking (all races)</option>
+            </select>
+          </div>
+
+          <!-- Division (populated when city is selected) -->
+          <div id="division-wrap" class="hidden">
+            <label class="text-xs text-gray-400 block mb-1">Division</label>
+            <select id="filter-division"
+              class="w-full h-10 bg-hyrox-dark border border-hyrox-gray rounded-lg px-3 text-sm text-white appearance-none focus:border-hyrox-yellow outline-none">
+              <option value="">All Divisions</option>
+            </select>
+          </div>
+
+          <div class="flex gap-2">
+            <!-- Gender -->
+            <div class="flex-1">
+              <label class="text-xs text-gray-400 block mb-1">Gender</label>
+              <select id="filter-sex"
+                class="w-full h-10 bg-hyrox-dark border border-hyrox-gray rounded-lg px-3 text-sm text-white appearance-none focus:border-hyrox-yellow outline-none">
+                <option value="">Any</option>
+              </select>
+            </div>
+
+            <!-- Age Group -->
+            <div class="flex-1">
+              <label class="text-xs text-gray-400 block mb-1">Age Group</label>
+              <select id="filter-age"
+                class="w-full h-10 bg-hyrox-dark border border-hyrox-gray rounded-lg px-3 text-sm text-white appearance-none focus:border-hyrox-yellow outline-none">
+                <option value="">Any</option>
+              </select>
+            </div>
+          </div>
+
+          <p class="text-gray-500 text-[10px]" id="filters-status">Loading filters from Hyrox...</p>
+        </div>
+
+        <button onclick="searchAthlete()" id="search-btn"
+          class="w-full py-3 rounded-xl bg-hyrox-yellow text-hyrox-dark font-semibold text-sm hover:bg-yellow-400 transition-colors">
+          Search Hyrox Results
+        </button>
+      </div>
+
+      <!-- Search Status -->
+      <div id="search-status" class="hidden text-center py-4">
+        <div class="inline-flex items-center gap-2 text-gray-400 text-sm">
+          <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          <span>Searching Hyrox results...</span>
+        </div>
+      </div>
+
+      <!-- Search Results -->
+      <div id="search-results" class="space-y-2 mb-4"></div>
+
+      <!-- Selected Athlete Splits -->
+      <div id="athlete-splits" class="hidden">
+        <div class="bg-hyrox-gray border border-hyrox-yellow/30 rounded-2xl overflow-hidden mb-4">
+          <div class="bg-hyrox-yellow/10 px-5 py-4 border-b border-hyrox-yellow/20">
+            <div class="flex justify-between items-center">
+              <div>
+                <span class="text-xs text-gray-400">Personal Best</span>
+                <div id="pb-name" class="font-bold text-lg"></div>
+              </div>
+              <span id="pb-overall" class="text-hyrox-yellow font-extrabold text-2xl"></span>
+            </div>
+          </div>
+          <div class="divide-y divide-hyrox-gray/30" id="pb-splits-list"></div>
+        </div>
+
+        <button onclick="importPB()" id="import-btn"
+          class="w-full py-3.5 rounded-xl bg-hyrox-yellow text-hyrox-dark font-bold text-sm hover:bg-yellow-400 transition-colors mb-3">
+          Import as My PB &amp; Set Targets
+        </button>
+        <p class="text-gray-500 text-xs text-center">This will set your station times and PB baseline, then take you to My Race.</p>
+      </div>
+
+      <!-- Or Manual Entry -->
+      <div class="mt-6 text-center">
+        <p class="text-gray-500 text-xs mb-2">Don't have a Hyrox result yet?</p>
+        <button onclick="showTab('setup')" class="text-hyrox-yellow text-sm font-semibold underline">Skip to manual setup</button>
+      </div>
+    </section>
+
+    <!-- ==================== MY RACE TAB ==================== -->
+    <section id="section-setup" class="hidden">
+
+      <!-- Target Finish Time -->
+      <div class="bg-gradient-to-br from-hyrox-gray to-hyrox-dark border border-hyrox-gray rounded-2xl p-6 mb-5">
+        <span class="text-hyrox-yellow text-xs font-semibold uppercase tracking-wider">Goal</span>
+        <h2 class="text-2xl font-extrabold mt-2">Target Finish Time</h2>
+        <p class="text-gray-400 text-sm mt-1">What time are you aiming for?</p>
+        <div class="flex items-center gap-3 mt-4">
+          <div class="flex items-center gap-1.5">
+            <input type="number" id="target-hours" min="0" max="3" value="1"
+              class="w-14 h-12 bg-hyrox-dark border border-hyrox-gray rounded-lg text-center text-xl font-bold text-hyrox-yellow focus:border-hyrox-yellow outline-none"
+              oninput="onTargetChange()" />
+            <span class="text-gray-400 text-sm">h</span>
+          </div>
+          <span class="text-2xl font-bold text-gray-500">:</span>
+          <div class="flex items-center gap-1.5">
+            <input type="number" id="target-mins" min="0" max="59" value="30"
+              class="w-14 h-12 bg-hyrox-dark border border-hyrox-gray rounded-lg text-center text-xl font-bold text-hyrox-yellow focus:border-hyrox-yellow outline-none"
+              oninput="onTargetChange()" />
+            <span class="text-gray-400 text-sm">m</span>
+          </div>
+          <span class="text-2xl font-bold text-gray-500">:</span>
+          <div class="flex items-center gap-1.5">
+            <input type="number" id="target-secs" min="0" max="59" value="0"
+              class="w-14 h-12 bg-hyrox-dark border border-hyrox-gray rounded-lg text-center text-xl font-bold text-hyrox-yellow focus:border-hyrox-yellow outline-none"
+              oninput="onTargetChange()" />
+            <span class="text-gray-400 text-sm">s</span>
+          </div>
+        </div>
+        <!-- Quick presets -->
+        <div class="flex gap-2 mt-3">
+          <button onclick="setTarget(75,0)" class="text-xs bg-hyrox-dark border border-hyrox-gray rounded-full px-3 py-1 text-gray-300 hover:border-hyrox-yellow">1:15</button>
+          <button onclick="setTarget(90,0)" class="text-xs bg-hyrox-dark border border-hyrox-gray rounded-full px-3 py-1 text-gray-300 hover:border-hyrox-yellow">1:30</button>
+          <button onclick="setTarget(105,0)" class="text-xs bg-hyrox-dark border border-hyrox-gray rounded-full px-3 py-1 text-gray-300 hover:border-hyrox-yellow">1:45</button>
+          <button onclick="setTarget(120,0)" class="text-xs bg-hyrox-dark border border-hyrox-gray rounded-full px-3 py-1 text-gray-300 hover:border-hyrox-yellow">2:00</button>
+        </div>
+      </div>
+
+      <!-- Category -->
+      <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-5 mb-4">
+        <label class="text-sm font-semibold block mb-3">Category</label>
+        <div class="flex gap-2">
+          <button onclick="setCategory('men_open')" id="cat-men_open" class="flex-1 py-2.5 rounded-lg text-xs font-semibold bg-hyrox-yellow text-hyrox-dark">Men's Open</button>
+          <button onclick="setCategory('women_open')" id="cat-women_open" class="flex-1 py-2.5 rounded-lg text-xs font-semibold bg-hyrox-gray text-gray-300 border border-hyrox-gray">Women's Open</button>
+          <button onclick="setCategory('doubles')" id="cat-doubles" class="flex-1 py-2.5 rounded-lg text-xs font-semibold bg-hyrox-gray text-gray-300 border border-hyrox-gray">Doubles</button>
+        </div>
+      </div>
+
+      <!-- Run Pace -->
+      <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-5 mb-4">
+        <div class="flex justify-between items-center mb-1">
+          <label class="text-sm font-semibold">1 km Run Pace</label>
+          <span id="pace-display" class="text-hyrox-yellow font-bold text-lg">5:30</span>
+        </div>
+        <p class="text-gray-400 text-xs mb-3">Your sustainable race pace — you need to hold this for 8 km.</p>
+        <input type="range" min="4" max="8" step="0.083" value="5.5" id="pace-slider" oninput="onPaceChange()" />
+        <div class="flex justify-between text-[10px] text-gray-500 mt-1">
+          <span>4:00 (fast)</span>
+          <span>8:00 (easy)</span>
+        </div>
+      </div>
+
+      <!-- Summary Card -->
+      <div class="bg-hyrox-gray border border-hyrox-yellow/30 rounded-2xl p-5 mb-4">
+        <div class="flex justify-between items-center mb-4">
+          <span class="text-sm font-semibold">Projected Time</span>
+          <span id="projected-time" class="text-hyrox-yellow font-extrabold text-2xl">--:--</span>
+        </div>
+        <div class="grid grid-cols-3 gap-3 text-center">
+          <div class="bg-hyrox-dark rounded-xl py-3">
+            <div id="summary-run" class="text-white font-bold">--:--</div>
+            <div class="text-gray-400 text-[10px] mt-0.5">Running</div>
+          </div>
+          <div class="bg-hyrox-dark rounded-xl py-3">
+            <div id="summary-stations" class="text-white font-bold">--:--</div>
+            <div class="text-gray-400 text-[10px] mt-0.5">Stations</div>
+          </div>
+          <div class="bg-hyrox-dark rounded-xl py-3">
+            <div id="summary-transitions" class="text-white font-bold">8:00</div>
+            <div class="text-gray-400 text-[10px] mt-0.5">Transitions</div>
+          </div>
+        </div>
+        <!-- Delta vs target -->
+        <div id="delta-banner" class="mt-4 rounded-xl px-4 py-3 text-center text-sm font-semibold hidden"></div>
+      </div>
+
+      <p class="text-gray-500 text-xs text-center mb-2">Set your station times in the <button onclick="showTab('stations')" class="text-hyrox-yellow underline">Stations</button> tab for an accurate projection.</p>
+    </section>
+
+    <!-- ==================== STATIONS TAB ==================== -->
+    <section id="section-stations" class="hidden">
+      <div class="bg-gradient-to-br from-hyrox-gray to-hyrox-dark border border-hyrox-gray rounded-2xl p-6 mb-5">
+        <span class="text-hyrox-yellow text-xs font-semibold uppercase tracking-wider">Your Estimates</span>
+        <h2 class="text-2xl font-extrabold mt-2">Station Times</h2>
+        <p class="text-gray-400 text-sm mt-1">Enter your best estimate or recent benchmark for each station.</p>
+      </div>
+
+      <div class="space-y-3" id="station-inputs">
+        <!-- Generated by JS -->
+      </div>
+
+      <div class="mt-5 bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-4">
+        <div class="flex justify-between items-center">
+          <span class="text-sm font-semibold">Total Station Time</span>
+          <span id="stations-total" class="text-hyrox-yellow font-bold text-lg">--:--</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== ANALYSIS TAB ==================== -->
+    <section id="section-analysis" class="hidden">
+      <div class="bg-gradient-to-br from-hyrox-gray to-hyrox-dark border border-hyrox-gray rounded-2xl p-6 mb-5">
+        <span class="text-hyrox-yellow text-xs font-semibold uppercase tracking-wider">Insights</span>
+        <h2 class="text-2xl font-extrabold mt-2">Race Analysis</h2>
+        <p class="text-gray-400 text-sm mt-1">See where you're losing time and what to focus on in training.</p>
+      </div>
+
+      <!-- Time Breakdown Donut -->
+      <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-5 mb-4">
+        <h3 class="text-sm font-semibold mb-4">Time Breakdown</h3>
+        <div class="flex items-center gap-6">
+          <div class="relative w-28 h-28 flex-shrink-0">
+            <svg viewBox="0 0 36 36" class="w-28 h-28 -rotate-90">
+              <circle cx="18" cy="18" r="15.5" fill="none" stroke="#2D2D2D" stroke-width="3"/>
+              <circle id="ring-run" cx="18" cy="18" r="15.5" fill="none" stroke="#F5E600" stroke-width="3"
+                stroke-dasharray="97.4" stroke-dashoffset="97.4" class="ring"/>
+              <circle id="ring-station" cx="18" cy="18" r="15.5" fill="none" stroke="#EF4444" stroke-width="3"
+                stroke-dasharray="97.4" stroke-dashoffset="97.4" class="ring"/>
+              <circle id="ring-transition" cx="18" cy="18" r="15.5" fill="none" stroke="#6B7280" stroke-width="3"
+                stroke-dasharray="97.4" stroke-dashoffset="97.4" class="ring"/>
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <span id="donut-total" class="text-sm font-bold">--:--</span>
+              <span class="text-[9px] text-gray-400">total</span>
+            </div>
+          </div>
+          <div class="space-y-2 text-sm">
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded-full bg-hyrox-yellow"></div>
+              <span class="text-gray-300">Running <strong id="breakdown-run" class="text-white">--</strong></span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded-full bg-red-500"></div>
+              <span class="text-gray-300">Stations <strong id="breakdown-station" class="text-white">--</strong></span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded-full bg-gray-500"></div>
+              <span class="text-gray-300">Transitions <strong class="text-white">8:00</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Station Rankings -->
+      <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-5 mb-4">
+        <h3 class="text-sm font-semibold mb-1">Station Performance</h3>
+        <p class="text-gray-500 text-xs mb-4">Ranked by time cost vs. benchmark. Biggest time leaks first.</p>
+        <div class="space-y-3" id="station-rankings">
+          <!-- Generated by JS -->
+        </div>
+      </div>
+
+      <!-- Improvement Suggestions -->
+      <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-5 mb-4">
+        <h3 class="text-sm font-semibold mb-1">Where to Improve</h3>
+        <p class="text-gray-500 text-xs mb-4">Actionable suggestions based on your current times.</p>
+        <div class="space-y-3" id="suggestions">
+          <!-- Generated by JS -->
+        </div>
+      </div>
+
+      <!-- Splits Table -->
+      <div class="bg-hyrox-gray border border-hyrox-yellow/30 rounded-2xl overflow-hidden">
+        <div class="bg-hyrox-yellow/10 px-5 py-3 border-b border-hyrox-yellow/20">
+          <h3 class="text-sm font-semibold">Full Race Splits</h3>
+        </div>
+        <!-- Table header -->
+        <div class="grid grid-cols-4 text-[10px] text-gray-400 uppercase tracking-wider px-5 py-2 border-b border-hyrox-gray/50">
+          <span>Segment</span>
+          <span class="text-center">Time</span>
+          <span class="text-center">Cumulative</span>
+          <span class="text-right">vs Target</span>
+        </div>
+        <div class="divide-y divide-hyrox-gray/30" id="splits-table">
+          <!-- Generated by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TRAIN TAB ==================== -->
+    <section id="section-train" class="hidden">
+
+      <!-- Weekly Plan View (default) -->
+      <div id="train-plan">
+        <div class="bg-gradient-to-br from-hyrox-gray to-hyrox-dark border border-hyrox-gray rounded-2xl p-6 mb-5">
+          <span class="text-hyrox-yellow text-xs font-semibold uppercase tracking-wider">This Week</span>
+          <h2 class="text-2xl font-extrabold mt-2">Training Plan</h2>
+          <p class="text-gray-400 text-sm mt-1">Based on your station analysis. Tap any day to start the workout.</p>
+        </div>
+        <div class="space-y-2" id="weekly-plan"></div>
+      </div>
+
+      <!-- Active Workout View (shown when a workout is active) -->
+      <div id="train-active" class="hidden">
+
+        <!-- Workout Header -->
+        <div class="flex items-center justify-between mb-4">
+          <button onclick="exitWorkout()" class="text-gray-400 hover:text-white text-sm flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            Back
+          </button>
+          <span id="workout-title" class="font-bold text-sm"></span>
+          <span id="workout-elapsed" class="text-gray-400 text-xs font-mono">00:00</span>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="w-full bg-hyrox-gray rounded-full h-1.5 mb-5">
+          <div id="workout-progress" class="bg-hyrox-yellow h-1.5 rounded-full bar-fill" style="width: 0%"></div>
+        </div>
+
+        <!-- Current Exercise Card -->
+        <div id="exercise-card" class="bg-hyrox-gray border border-hyrox-yellow/30 rounded-2xl p-6 mb-4 text-center">
+          <div id="exercise-phase" class="text-xs font-semibold uppercase tracking-wider mb-2">WORK</div>
+          <div id="exercise-name" class="text-xl font-extrabold mb-1"></div>
+          <div id="exercise-detail" class="text-gray-400 text-sm mb-4"></div>
+
+          <!-- Timer Circle -->
+          <div class="relative w-40 h-40 mx-auto mb-4">
+            <svg viewBox="0 0 36 36" class="w-40 h-40 -rotate-90">
+              <circle cx="18" cy="18" r="16" fill="none" stroke="#2D2D2D" stroke-width="2"/>
+              <circle id="timer-ring" cx="18" cy="18" r="16" fill="none" stroke="#F5E600" stroke-width="2"
+                stroke-dasharray="100.5" stroke-dashoffset="0" stroke-linecap="round"
+                style="transition: stroke-dashoffset 0.3s linear"/>
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <span id="timer-display" class="text-4xl font-extrabold font-mono">0:00</span>
+              <span id="timer-label" class="text-gray-400 text-xs mt-1"></span>
+            </div>
+          </div>
+
+          <!-- Tip -->
+          <div id="exercise-tip" class="bg-hyrox-dark rounded-xl px-4 py-3 text-xs text-gray-300 leading-relaxed"></div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex gap-3 mb-4">
+          <button onclick="prevExercise()" id="btn-prev"
+            class="flex-1 py-3 rounded-xl bg-hyrox-gray border border-hyrox-gray text-gray-300 font-semibold text-sm">
+            ← Prev
+          </button>
+          <button onclick="toggleTimer()" id="btn-pause"
+            class="flex-[2] py-3 rounded-xl bg-hyrox-yellow text-hyrox-dark font-bold text-sm">
+            Start
+          </button>
+          <button onclick="nextExercise()" id="btn-next"
+            class="flex-1 py-3 rounded-xl bg-hyrox-gray border border-hyrox-gray text-gray-300 font-semibold text-sm">
+            Next →
+          </button>
+        </div>
+
+        <!-- Exercise List (mini) -->
+        <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-4">
+          <div class="text-xs font-semibold text-gray-400 mb-2">Exercises</div>
+          <div class="space-y-1" id="exercise-list-mini"></div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ==================== RACE DAY TAB ==================== -->
+    <section id="section-raceday" class="hidden">
+      <div class="bg-gradient-to-br from-hyrox-gray to-hyrox-dark border border-hyrox-gray rounded-2xl p-6 mb-6">
+        <span class="text-hyrox-yellow text-xs font-semibold uppercase tracking-wider">Be Prepared</span>
+        <h2 class="text-2xl font-extrabold mt-2">Race Day Guide</h2>
+        <p class="text-gray-300 mt-2 text-sm">Everything you need to know before, during, and after.</p>
+      </div>
+
+      <h3 class="font-bold mb-3">Packing Checklist</h3>
+      <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-4 mb-6 space-y-2" id="checklist"></div>
+
+      <h3 class="font-bold mb-3">Strategy Tips</h3>
+      <div class="space-y-3 mb-6" id="strategy-tips"></div>
+
+      <h3 class="font-bold mb-3">Nutrition Timeline</h3>
+      <div class="space-y-3" id="nutrition-timeline"></div>
+    </section>
+
+  </main>
+
+  <script src="js/data.js?v=3"></script>
+  <script src="js/workouts.js?v=3"></script>
+  <script src="js/app.js?v=3"></script>
+</body>
+</html>
