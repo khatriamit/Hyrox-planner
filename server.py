@@ -185,6 +185,9 @@ def search_athletes(first_name="", last_name="", event="", sex="", age_class="")
 
 def get_athlete_splits(detail_path):
     """Fetch an athlete's detail page and extract all split times."""
+    # Decode any double-encoded URLs
+    detail_path = urllib.parse.unquote(detail_path)
+
     if detail_path.startswith("http"):
         url = detail_path
     elif detail_path.startswith("?") or detail_path.startswith("/"):

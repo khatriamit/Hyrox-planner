@@ -436,23 +436,31 @@ async function searchAthlete() {
       return;
     }
 
+    // Hyrox-style results table
     resultsEl.innerHTML = `
-      <div class="text-xs text-gray-400 mb-2">${data.count} result${data.count !== 1 ? 's' : ''} found</div>
-      ${data.athletes.map((a, i) => `
-        <button onclick='selectAthlete(${JSON.stringify(a).replace(/'/g, "&#39;")})'
-          class="w-full text-left bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-4 hover:border-hyrox-yellow transition-colors">
-          <div class="flex justify-between items-center">
-            <div>
-              <div class="font-semibold text-sm">${a.name || 'Unknown'}</div>
-              <div class="text-gray-400 text-xs">${[a.division, a.nationality, a.age_group].filter(Boolean).join(' · ')}</div>
-            </div>
-            <div class="text-right">
-              <div class="text-hyrox-yellow font-bold">${a.overall_time || '--'}</div>
-              <div class="text-gray-500 text-[10px]">${a.place ? '#' + a.place : ''}</div>
-            </div>
-          </div>
-        </button>
-      `).join('')}`;
+      <div class="text-gray-400 text-xs mb-2">${data.count} result${data.count !== 1 ? 's' : ''} found</div>
+      <div class="border border-hyrox-gray/50 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-hyrox-gray/60 text-xs text-gray-300 uppercase tracking-wider">
+              <th class="text-left py-2 px-3 font-semibold w-14">Rank</th>
+              <th class="text-left py-2 px-3 font-semibold">Name</th>
+              <th class="text-left py-2 px-3 font-semibold hidden sm:table-cell">City</th>
+              <th class="text-right py-2 px-3 font-semibold w-20">Total</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-hyrox-gray/30">
+            ${data.athletes.map(a => `
+              <tr onclick='selectAthlete(${JSON.stringify(a).replace(/'/g, "&#39;")})' class="hover:bg-hyrox-gray/30 cursor-pointer transition-colors">
+                <td class="py-2.5 px-3 text-gray-400">${a.place || '-'}</td>
+                <td class="py-2.5 px-3"><span class="text-hyrox-yellow font-medium hover:underline">${a.name || 'Unknown'}</span></td>
+                <td class="py-2.5 px-3 text-gray-400 hidden sm:table-cell">${a.city || ''}</td>
+                <td class="py-2.5 px-3 text-right font-mono">${a.overall_time || '--:--'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
 
   } catch (err) {
     statusEl.classList.add('hidden');
@@ -477,76 +485,68 @@ async function selectAthlete(athlete) {
 
   // Show loading in splits area
   splitsEl.classList.remove('hidden');
-  document.getElementById('pb-name').textContent = athlete.name || 'Loading...';
-  document.getElementById('pb-overall').textContent = athlete.overall_time || '--:--';
-  listEl.innerHTML = `
-    <div class="px-5 py-4 text-center text-gray-400 text-sm">
-      <div class="inline-flex items-center gap-2">
-        <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-        </svg>
-        Loading splits...
-      </div>
-    </div>`;
+  document.getElementById('pb-participant-info').innerHTML = `<div class="text-gray-400 text-sm">${athlete.name || 'Loading...'}</div>`;
+  listEl.innerHTML = `<tr><td colspan="2" class="py-4 text-center text-gray-400 text-sm">Loading splits...</td></tr>`;
 
   try {
     const resp = await fetch(`/api/athlete?url=${encodeURIComponent(athlete.detail_url)}`);
     const data = await resp.json();
 
     if (data.error || !data.splits) {
-      listEl.innerHTML = `<div class="px-5 py-4 text-center text-red-400 text-sm">Could not load splits: ${data.error || 'Unknown error'}</div>`;
+      listEl.innerHTML = `<tr><td colspan="2" class="py-4 text-center text-red-400 text-sm">Could not load splits: ${data.error || 'Unknown error'}</td></tr>`;
       return;
     }
 
     pendingPBSplits = data.splits;
     pendingPBName = athlete.name || '';
 
+    // Populate participant info
+    const infoEl = document.getElementById('pb-participant-info');
+    infoEl.innerHTML = `
+      <div class="flex justify-between"><span class="text-gray-400">Name</span><span>${athlete.name || ''}</span></div>
+      <div class="flex justify-between"><span class="text-gray-400">City</span><span>${athlete.city || ''}</span></div>
+      ${data.splits.overall ? `<div class="flex justify-between"><span class="text-gray-400">Total</span><span class="text-hyrox-yellow font-bold">${fmt(data.splits.overall)}</span></div>` : ''}
+    `;
+
     // Map station icons
     const stationInfo = {};
     STATIONS.forEach(s => { stationInfo[s.id] = { icon: s.icon, name: s.name }; });
 
-    // Build splits display
+    // Build splits as table rows (Hyrox style: Split | Time)
     const stationIds = ['ski_erg', 'sled_push', 'sled_pull', 'burpee_broad_jump', 'rowing', 'farmers_carry', 'sandbag_lunges', 'wall_balls'];
     let html = '';
 
-    // Show runs
-    for (let i = 1; i <= 8; i++) {
-      const key = `run_${i}`;
-      if (data.splits[key]) {
-        html += `
-          <div class="px-5 py-2.5 flex justify-between items-center">
-            <span class="text-gray-400 text-sm">Run ${i}</span>
-            <span class="font-medium text-sm">${fmt(data.splits[key])}</span>
-          </div>`;
+    // Interleave runs and stations like the real Hyrox page
+    for (let i = 0; i < 8; i++) {
+      const runKey = `run_${i + 1}`;
+      if (data.splits[runKey]) {
+        html += `<tr><td class="py-1.5 text-gray-400">Running ${i + 1}</td><td class="py-1.5 text-right font-mono">${fmt(data.splits[runKey])}</td></tr>`;
+      }
+      const stId = stationIds[i];
+      if (data.splits[stId]) {
+        const info = stationInfo[stId] || { name: stId };
+        html += `<tr><td class="py-1.5">${info.name}</td><td class="py-1.5 text-right font-mono text-hyrox-yellow font-bold">${fmt(data.splits[stId])}</td></tr>`;
       }
     }
 
-    // Show stations
-    stationIds.forEach(id => {
-      if (data.splits[id]) {
-        const info = stationInfo[id] || { icon: '', name: id };
-        html += `
-          <div class="px-5 py-2.5 flex justify-between items-center">
-            <span class="text-sm">${info.icon} ${info.name}</span>
-            <span class="font-bold text-sm text-hyrox-yellow">${fmt(data.splits[id])}</span>
-          </div>`;
-      }
-    });
+    // Roxzone
+    if (data.splits.roxzone) {
+      html += `<tr><td class="py-1.5 text-gray-400">Roxzone Time</td><td class="py-1.5 text-right font-mono">${fmt(data.splits.roxzone)}</td></tr>`;
+    }
 
     // Overall
     if (data.splits.overall) {
-      document.getElementById('pb-overall').textContent = fmt(data.splits.overall);
+      html += `<tr class="border-t border-hyrox-yellow/30"><td class="py-2 font-bold">Overall</td><td class="py-2 text-right font-mono font-bold text-hyrox-yellow text-base">${fmt(data.splits.overall)}</td></tr>`;
     }
 
     if (!html) {
-      html = `<div class="px-5 py-4 text-center text-gray-400 text-sm">No detailed splits found. The results page may have a different format.</div>`;
+      html = `<tr><td colspan="2" class="py-4 text-center text-gray-400">No detailed splits found.</td></tr>`;
     }
 
     listEl.innerHTML = html;
 
   } catch (err) {
-    listEl.innerHTML = `<div class="px-5 py-4 text-center text-red-400 text-sm">Failed to load splits: ${err.message}</div>`;
+    listEl.innerHTML = `<tr><td colspan="2" class="py-4 text-center text-red-400 text-sm">Failed to load splits: ${err.message}</td></tr>`;
   }
 }
 
@@ -604,15 +604,8 @@ document.addEventListener('keydown', (e) => {
 let filtersData = null;
 
 function toggleFilters() {
-  const panel = document.getElementById('filters-panel');
-  const chevron = document.getElementById('filters-chevron');
-  panel.classList.toggle('hidden');
-  chevron.classList.toggle('rotate-180');
-
-  // Load filters on first open
-  if (!filtersData && !panel.classList.contains('hidden')) {
-    loadFilters();
-  }
+  // Legacy — filters are always visible now. Just load them.
+  if (!filtersData) loadFilters();
 }
 
 async function loadFilters() {
@@ -1005,4 +998,5 @@ document.addEventListener('DOMContentLoaded', () => {
   renderChecklist();
   renderStrategyTips();
   renderNutrition();
+  loadFilters(); // Auto-load filter options for Import PB tab
 });
