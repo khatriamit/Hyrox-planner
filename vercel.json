@@ -6,7 +6,10 @@
     { "source": "/api/athlete", "destination": "/api/athlete" },
     { "source": "/api/filters", "destination": "/api/filters" },
     { "source": "/api/garmin/auth", "destination": "/api/garmin/auth" },
-    { "source": "/api/garmin/activities", "destination": "/api/garmin/activities" }
+    { "source": "/api/garmin/activities", "destination": "/api/garmin/activities" },
+    { "source": "/api/strava/auth", "destination": "/api/strava/auth" },
+    { "source": "/api/strava/callback", "destination": "/api/strava/callback" },
+    { "source": "/api/strava/activities", "destination": "/api/strava/activities" }
   ],
   "headers": [
     {

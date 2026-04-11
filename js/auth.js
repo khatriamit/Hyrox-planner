@@ -228,6 +228,7 @@ const WEARABLE_ICONS = {
   oura: `<svg viewBox="0 0 24 24" class="w-6 h-6"><circle cx="12" cy="12" r="8" fill="none" stroke="#2A72DE" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="#2A72DE" stroke-width="1.5"/></svg>`,
   luna: `<svg viewBox="0 0 24 24" class="w-6 h-6"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" fill="none" stroke="#5EEAD4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   noisefit: `<svg viewBox="0 0 24 24" class="w-6 h-6"><circle cx="12" cy="12" r="9" fill="none" stroke="#FF6B35" stroke-width="2"/><path d="M8 14l2-4 2 4 2-4 2 4" stroke="#FF6B35" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
+  strava: `<svg viewBox="0 0 24 24" class="w-6 h-6"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.6h4.172L10.463 0l-7 13.828h4.169" fill="#FC4C02"/></svg>`,
 };
 
 const WEARABLES = {
@@ -237,6 +238,7 @@ const WEARABLES = {
   oura: { name: 'Oura Ring', icon: WEARABLE_ICONS.oura, color: 'purple', desc: 'Track sleep quality, readiness, and activity from Oura.' },
   luna: { name: 'Luna Ring', icon: WEARABLE_ICONS.luna, color: 'teal', desc: 'Sync sleep, stress, and wellness metrics from Luna Ring.' },
   noisefit: { name: 'NoiseFit', icon: WEARABLE_ICONS.noisefit, color: 'orange', desc: 'Import workouts, heart rate, and SpO2 data from NoiseFit smartwatches.' },
+  strava: { name: 'Strava', icon: WEARABLE_ICONS.strava, color: 'orange', desc: 'Import runs, workouts, and race data directly from Strava. Works with all devices.' },
 };
 
 let wearableActivities = [];
@@ -304,7 +306,7 @@ function renderWearableHub() {
 
   const deviceCards = Object.entries(WEARABLES).map(([id, dev]) => {
     const isConnected = user?.wearables?.[id]?.connected;
-    const colorMap = { pink: 'border-pink-500/40', blue: 'border-blue-500/40', red: 'border-red-500/40', purple: 'border-purple-500/40', teal: 'border-teal-500/40' };
+    const colorMap = { pink: 'border-pink-500/40', blue: 'border-blue-500/40', red: 'border-red-500/40', purple: 'border-purple-500/40', teal: 'border-teal-500/40', orange: 'border-orange-500/40' };
     const borderColor = isConnected ? (colorMap[dev.color] || 'border-hyrox-yellow/40') : 'border-hyrox-gray';
     return `
       <div class="bg-hyrox-gray/30 border ${borderColor} rounded-xl p-4">
@@ -337,17 +339,201 @@ function renderWearableHub() {
 
 async function connectWearableOAuth(deviceId) {
   const dev = WEARABLES[deviceId];
-  try {
-    const resp = await fetch(`/api/garmin/auth?device=${deviceId}`);
-    const data = await resp.json();
-    if (data.auth_url) {
-      window.location.href = data.auth_url;
-    } else {
-      alert(`${dev.name} API not configured on server. Use "Demo" for testing.`);
-    }
-  } catch (err) {
-    alert(`Could not reach ${dev.name} auth endpoint. Use "Demo" to test.`);
+
+  // Strava has a real OAuth2 flow built
+  if (deviceId === 'strava') {
+    return connectStravaOAuth();
   }
+
+  // For devices that need native apps (Apple Health) or business API partnerships
+  const nativeOnly = ['apple_health'];
+  const needsStrava = ['garmin', 'whoop', 'oura', 'luna', 'noisefit'];
+
+  if (nativeOnly.includes(deviceId)) {
+    showWearableConnectHelp(deviceId, 'native');
+    return;
+  }
+
+  if (needsStrava.includes(deviceId)) {
+    showWearableConnectHelp(deviceId, 'strava');
+    return;
+  }
+}
+
+function showWearableConnectHelp(deviceId, helpType) {
+  const dev = WEARABLES[deviceId];
+  const modal = document.createElement('div');
+  modal.id = 'wearable-help-modal';
+  modal.className = 'fixed inset-0 bg-black/80 z-[60] flex items-end justify-center';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+  let content = '';
+  if (helpType === 'native') {
+    content = `
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 bg-hyrox-dark rounded-xl flex items-center justify-center">${dev.icon}</div>
+        <div>
+          <div class="font-bold text-sm">${dev.name}</div>
+          <div class="text-gray-500 text-[10px]">Requires native app</div>
+        </div>
+      </div>
+      <p class="text-gray-300 text-sm mb-4">${dev.name} data is only accessible through native iOS/Android apps. In a web app, you can:</p>
+      <div class="space-y-2 mb-4">
+        <div class="bg-hyrox-dark rounded-xl p-3 flex items-center gap-3">
+          <span>📱</span>
+          <span class="text-sm">Sync ${dev.name} → <strong class="text-hyrox-yellow">Strava</strong> on your phone</span>
+        </div>
+        <div class="bg-hyrox-dark rounded-xl p-3 flex items-center gap-3">
+          <span>🔗</span>
+          <span class="text-sm">Then connect Strava here to import activities</span>
+        </div>
+      </div>
+      <button onclick="document.getElementById('wearable-help-modal').remove(); connectWearableOAuth('strava')" class="w-full py-3 bg-[#FC4C02] text-white font-bold text-sm rounded-xl hover:opacity-90 transition-colors mb-2">
+        Connect via Strava
+      </button>
+      <button onclick="document.getElementById('wearable-help-modal').remove(); connectWearableDemo('${deviceId}')" class="w-full py-3 bg-hyrox-gray border border-hyrox-gray text-gray-300 font-semibold text-xs rounded-xl hover:border-hyrox-yellow transition-colors">
+        Use Demo Data Instead
+      </button>`;
+  } else if (helpType === 'strava') {
+    const syncInstructions = {
+      garmin: 'Open Garmin Connect app → Settings → Connected Apps → Strava',
+      whoop: 'Open WHOOP app → Profile → Connected Apps → Strava',
+      oura: 'Open Oura app → Settings → Connected Services → Strava',
+      luna: 'Open Luna app → Settings → Third Party → Strava',
+      noisefit: 'Open NoiseFit app → Profile → Third Party Sync → Strava',
+    };
+
+    content = `
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 bg-hyrox-dark rounded-xl flex items-center justify-center">${dev.icon}</div>
+        <div>
+          <div class="font-bold text-sm">${dev.name}</div>
+          <div class="text-gray-500 text-[10px]">Connect via Strava</div>
+        </div>
+      </div>
+      <p class="text-gray-300 text-sm mb-4">The fastest way to get your ${dev.name} data is through Strava — it syncs automatically.</p>
+      <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-4 mb-4">
+        <div class="text-xs font-semibold text-hyrox-yellow mb-2">Quick Setup (1 min)</div>
+        <div class="space-y-2">
+          <div class="flex items-start gap-2 text-xs text-gray-300">
+            <span class="text-hyrox-yellow font-bold">1.</span>
+            <span>${syncInstructions[deviceId] || 'Sync your device to Strava in its app settings'}</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-gray-300">
+            <span class="text-hyrox-yellow font-bold">2.</span>
+            <span>Connect Strava below — all your ${dev.name} workouts will appear</span>
+          </div>
+        </div>
+      </div>
+      <button onclick="document.getElementById('wearable-help-modal').remove(); connectWearableOAuth('strava')" class="w-full py-3 bg-[#FC4C02] text-white font-bold text-sm rounded-xl hover:opacity-90 transition-colors mb-2">
+        Connect Strava
+      </button>
+      <button onclick="document.getElementById('wearable-help-modal').remove(); connectWearableDemo('${deviceId}')" class="w-full py-3 bg-hyrox-gray border border-hyrox-gray text-gray-300 font-semibold text-xs rounded-xl hover:border-hyrox-yellow transition-colors">
+        Use Demo Data Instead
+      </button>`;
+  }
+
+  modal.innerHTML = `
+    <div class="w-full max-w-lg bg-hyrox-dark border-t border-hyrox-gray rounded-t-2xl p-6">
+      <div class="flex justify-end mb-2">
+        <button onclick="document.getElementById('wearable-help-modal').remove()" class="w-8 h-8 bg-hyrox-gray rounded-lg flex items-center justify-center">
+          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      ${content}
+    </div>`;
+
+  document.body.appendChild(modal);
+}
+
+// ---- Strava Real OAuth2 Flow ----
+function connectStravaOAuth() {
+  // Open Strava auth in popup
+  const popup = window.open('/api/strava/auth', 'strava_auth', 'width=500,height=700,scrollbars=yes');
+
+  if (!popup) {
+    // Popup blocked — redirect instead
+    window.location.href = '/api/strava/auth';
+    return;
+  }
+
+  // Listen for the callback message
+  const listener = (event) => {
+    if (event.data && event.data.type === 'strava_auth') {
+      window.removeEventListener('message', listener);
+
+      // Save Strava tokens
+      const user = getCurrentUser();
+      const wearables = user?.wearables || {};
+      wearables.strava = {
+        connected: true,
+        displayName: `${event.data.athlete?.firstname || ''} ${event.data.athlete?.lastname || ''}`.trim() || 'Strava Athlete',
+        connectedAt: new Date().toISOString(),
+        isDemo: false,
+        accessToken: event.data.access_token,
+        refreshToken: event.data.refresh_token,
+        expiresAt: event.data.expires_at,
+        athlete: event.data.athlete,
+      };
+
+      // Also mark the device they originally wanted as connected via Strava
+      updateUser({ wearables, connectedWearables: { strava: true } });
+      activeWearableId = 'strava';
+      renderWearableHub();
+    } else if (event.data && event.data.type === 'strava_error') {
+      window.removeEventListener('message', listener);
+      alert('Strava connection failed: ' + (event.data.error || 'Unknown error'));
+    }
+  };
+  window.addEventListener('message', listener);
+}
+
+async function syncStravaActivities() {
+  const user = getCurrentUser();
+  const strava = user?.wearables?.strava;
+  if (!strava?.accessToken) return [];
+
+  try {
+    const resp = await fetch(`/api/strava/activities?token=${strava.accessToken}`);
+    if (!resp.ok) throw new Error('API error');
+    const activities = await resp.json();
+
+    // Transform Strava activities to our format
+    return activities.map(a => ({
+      name: a.name,
+      type: mapStravaType(a.type),
+      date: new Date(a.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      duration: formatStravaDuration(a.moving_time),
+      distance: a.distance > 0 ? (a.distance / 1000).toFixed(1) + ' km' : '',
+      hr_avg: a.average_heartrate ? Math.round(a.average_heartrate) : null,
+      hr_max: a.max_heartrate ? Math.round(a.max_heartrate) : null,
+      calories: a.calories || null,
+      pace: a.type === 'Run' && a.distance > 0 ? formatStravaPace(a.moving_time, a.distance) : '',
+      strava_id: a.id,
+      raw: a,
+    }));
+  } catch (err) {
+    console.error('Strava sync error:', err);
+    return [];
+  }
+}
+
+function mapStravaType(stravaType) {
+  const map = { Run: 'running', Ride: 'cycling', WeightTraining: 'strength', Rowing: 'rowing', CrossFit: 'hyrox', Workout: 'strength' };
+  return map[stravaType] || 'other';
+}
+
+function formatStravaDuration(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function formatStravaPace(seconds, meters) {
+  const paceSecPerKm = seconds / (meters / 1000);
+  const min = Math.floor(paceSecPerKm / 60);
+  const sec = Math.round(paceSecPerKm % 60);
+  return `${min}:${sec.toString().padStart(2, '0')}/km`;
 }
 
 function connectWearableDemo(deviceId) {
@@ -389,6 +575,14 @@ async function syncWearableActivities(deviceId) {
   if (conn?.isDemo) {
     await new Promise(r => setTimeout(r, 800));
     wearableActivities = generateDemoActivities();
+  } else if (deviceId === 'strava' && conn?.accessToken) {
+    // Real Strava sync
+    const activities = await syncStravaActivities();
+    if (activities.length > 0) {
+      wearableActivities = activities;
+    } else {
+      wearableActivities = generateDemoActivities();
+    }
   } else {
     try {
       const resp = await fetch(`/api/garmin/activities?device=${deviceId}`);
