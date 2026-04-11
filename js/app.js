@@ -843,6 +843,13 @@ function exitWorkout() {
   activeWorkout = null;
   document.getElementById('train-plan').classList.remove('hidden');
   document.getElementById('train-active').classList.add('hidden');
+
+  // Re-render the plan to reflect updated recovery
+  if (state.raceDate && typeof renderPeriodizedPlan === 'function') {
+    renderPeriodizedPlan();
+  } else {
+    renderWeeklyPlan();
+  }
 }
 
 function renderCurrentExercise() {
@@ -949,17 +956,31 @@ function nextExercise() {
     currentExIdx++;
     renderCurrentExercise();
   } else {
-    // Workout complete
+    // Workout complete — show post-workout analysis
     clearInterval(timerInterval);
     clearInterval(elapsedInterval);
     timerRunning = false;
-    document.getElementById('exercise-card').innerHTML = `
-      <div class="py-8 text-center">
-        <div class="text-4xl mb-3">🏁</div>
-        <div class="text-xl font-extrabold text-hyrox-yellow mb-2">Workout Complete!</div>
-        <div class="text-gray-400 text-sm">Total time: ${fmt(totalElapsed)}</div>
-        <button onclick="exitWorkout()" class="mt-4 px-6 py-2.5 bg-hyrox-yellow text-hyrox-dark font-semibold rounded-xl text-sm">Back to Plan</button>
-      </div>`;
+
+    // Log session to recovery matrix
+    const workoutMeta = {
+      type: activeWorkout.type === 'drills' ? 'stations' : activeWorkout.type === 'interval' ? 'run' : activeWorkout.type === 'sim' ? 'sim' : 'stations',
+      intensity: activeWorkout.steps.some(s => s.phase === 'WORK') ? 'moderate' : 'easy',
+      duration: Math.round(totalElapsed / 60),
+    };
+    if (typeof markSessionComplete === 'function') {
+      markSessionComplete(workoutMeta.type, workoutMeta.intensity, workoutMeta.duration);
+    }
+
+    // Save to workout history
+    saveWorkoutToHistory({
+      ...workoutMeta,
+      name: activeWorkout.name || 'Workout',
+      totalSeconds: totalElapsed,
+      stepsCompleted: activeWorkout.steps.length,
+      date: new Date().toISOString(),
+    });
+
+    showPostWorkoutAnalysis(totalElapsed, workoutMeta);
   }
 }
 
@@ -983,6 +1004,314 @@ function renderExerciseList() {
       ${step.duration > 0 ? `<span class="text-gray-600">${fmt(step.duration)}</span>` : ''}
     </div>`;
   }).join('');
+}
+
+// ============================================================
+// Workout History — persisted to localStorage
+// ============================================================
+const WORKOUT_HISTORY_KEY = 'hyrox_workout_history';
+
+function loadWorkoutHistory() {
+  try {
+    const raw = localStorage.getItem(WORKOUT_HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (_) { return []; }
+}
+
+function saveWorkoutToHistory(workout) {
+  const history = loadWorkoutHistory();
+  history.unshift(workout); // newest first
+  // Keep last 100
+  if (history.length > 100) history.length = 100;
+  localStorage.setItem(WORKOUT_HISTORY_KEY, JSON.stringify(history));
+}
+
+// ============================================================
+// Post-Workout Analysis — shown after completing a workout
+// ============================================================
+function showPostWorkoutAnalysis(totalSeconds, meta) {
+  const totalMins = Math.round(totalSeconds / 60);
+  const history = loadWorkoutHistory();
+  const sameTypeHistory = history.filter(h => h.type === meta.type).slice(1, 6); // exclude current, last 5
+
+  // Generate wearable workout data (HR zones, calories, etc.)
+  const wearableData = getPostWorkoutWearableData(meta, totalSeconds);
+
+  // Calculate trends
+  let trendHtml = '';
+  if (sameTypeHistory.length > 0) {
+    const avgPrevDuration = sameTypeHistory.reduce((s, h) => s + h.totalSeconds, 0) / sameTypeHistory.length;
+    const delta = totalSeconds - avgPrevDuration;
+    const deltaMin = Math.abs(delta / 60).toFixed(1);
+    const isFaster = delta < 0;
+    trendHtml = `
+      <div class="flex items-center gap-2 mt-2 p-3 rounded-xl ${isFaster ? 'bg-green-500/10 border border-green-500/20' : 'bg-orange-500/10 border border-orange-500/20'}">
+        <span class="text-lg">${isFaster ? '📈' : '📉'}</span>
+        <div class="text-xs">
+          <span class="font-semibold ${isFaster ? 'text-green-400' : 'text-orange-400'}">${isFaster ? deltaMin + ' min faster' : deltaMin + ' min slower'}</span>
+          <span class="text-gray-400"> vs your avg ${meta.type} session (${Math.round(avgPrevDuration / 60)} min)</span>
+        </div>
+      </div>`;
+  }
+
+  // Recovery impact preview
+  const recovery = typeof calculateRecoveryScore === 'function' ? calculateRecoveryScore() : null;
+  let recoveryImpactHtml = '';
+  if (recovery) {
+    const zone = recovery.zone;
+    recoveryImpactHtml = `
+      <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-4">
+        <div class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Recovery Impact</div>
+        <div class="flex items-center gap-3 mb-3">
+          <span class="text-lg">${zone.icon}</span>
+          <div>
+            <div class="font-semibold text-sm ${zone.color}">${zone.label}</div>
+            <div class="text-[10px] text-gray-500">Updated after this session</div>
+          </div>
+          <div class="ml-auto text-right">
+            <div class="text-lg font-bold">${Math.round(recovery.overall * 100)}%</div>
+            <div class="text-[9px] text-gray-500">Fatigue</div>
+          </div>
+        </div>
+        <div class="grid grid-cols-4 gap-2">
+          ${['legs', 'cardio', 'upper', 'core'].map(g => {
+            const pct = Math.round(recovery.fatigue[g] * 100);
+            const icons = { legs: '🦵', cardio: '❤️', upper: '💪', core: '🎯' };
+            const barColor = pct > 70 ? 'bg-red-400' : pct > 40 ? 'bg-yellow-400' : 'bg-green-400';
+            return `<div class="text-center">
+              <span class="text-xs">${icons[g]}</span>
+              <div class="w-full h-1.5 bg-hyrox-dark rounded-full mt-1 overflow-hidden">
+                <div class="${barColor} h-full rounded-full" style="width:${pct}%"></div>
+              </div>
+              <div class="text-[9px] text-gray-500 mt-0.5">${pct}%</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }
+
+  // Wearable data card
+  let wearableCardHtml = '';
+  if (wearableData) {
+    wearableCardHtml = `
+      <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="text-xs font-semibold uppercase tracking-wider text-gray-400">Wearable Data</div>
+          <span class="text-[9px] text-gray-500">${wearableData.deviceLabel}</span>
+        </div>
+
+        <!-- HR Zones -->
+        <div class="mb-3">
+          <div class="text-[10px] text-gray-400 mb-1.5">Heart Rate Zones</div>
+          <div class="flex h-3 rounded-full overflow-hidden mb-1">
+            ${wearableData.hrZones.map(z => `<div class="${z.color}" style="width:${z.pct}%" title="${z.label}: ${z.pct}%"></div>`).join('')}
+          </div>
+          <div class="flex justify-between">
+            ${wearableData.hrZones.map(z => `<span class="text-[8px] ${z.textColor}">${z.label} ${z.pct}%</span>`).join('')}
+          </div>
+        </div>
+
+        <!-- Key metrics -->
+        <div class="grid grid-cols-4 gap-3">
+          <div class="text-center">
+            <div class="text-sm font-bold text-red-400">${wearableData.avgHR}</div>
+            <div class="text-[9px] text-gray-500">Avg HR</div>
+          </div>
+          <div class="text-center">
+            <div class="text-sm font-bold text-red-300">${wearableData.maxHR}</div>
+            <div class="text-[9px] text-gray-500">Max HR</div>
+          </div>
+          <div class="text-center">
+            <div class="text-sm font-bold text-orange-400">${wearableData.calories}</div>
+            <div class="text-[9px] text-gray-500">Calories</div>
+          </div>
+          <div class="text-center">
+            <div class="text-sm font-bold text-blue-400">${wearableData.trainingEffect || '—'}</div>
+            <div class="text-[9px] text-gray-500">T. Effect</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // Training load sparkline (last 7 sessions)
+  let loadSparkHtml = '';
+  if (history.length > 1) {
+    const recent = history.slice(0, 7).reverse();
+    const maxDur = Math.max(...recent.map(h => h.totalSeconds));
+    loadSparkHtml = `
+      <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-4">
+        <div class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Recent Training Load</div>
+        <div class="flex items-end gap-1 h-16">
+          ${recent.map((h, i) => {
+            const pct = maxDur > 0 ? (h.totalSeconds / maxDur * 100) : 10;
+            const isLatest = i === recent.length - 1;
+            const typeColors = { stations: 'bg-red-400', run: 'bg-blue-400', sim: 'bg-hyrox-yellow', strength: 'bg-purple-400' };
+            const bgColor = typeColors[h.type] || 'bg-gray-400';
+            const d = new Date(h.date);
+            const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 2);
+            return `<div class="flex-1 flex flex-col items-center gap-1">
+              <div class="w-full ${bgColor} ${isLatest ? 'opacity-100' : 'opacity-60'} rounded-t transition-all" style="height:${Math.max(8, pct)}%"></div>
+              <span class="text-[8px] ${isLatest ? 'text-white font-bold' : 'text-gray-500'}">${dayLabel}</span>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="flex justify-between mt-2 text-[9px] text-gray-500">
+          <span>${recent.length} sessions</span>
+          <span>Total: ${Math.round(recent.reduce((s, h) => s + h.totalSeconds, 0) / 60)} min</span>
+        </div>
+      </div>`;
+  }
+
+  // Build the full analysis screen
+  const card = document.getElementById('exercise-card');
+  card.className = 'rounded-2xl mb-4'; // Remove the border style
+  card.innerHTML = `
+    <div class="py-4">
+      <!-- Celebration header -->
+      <div class="text-center mb-5">
+        <div class="text-5xl mb-2">🏁</div>
+        <div class="text-xl font-extrabold text-hyrox-yellow mb-1">Workout Complete!</div>
+        <div class="text-gray-400 text-sm">${activeWorkout ? activeWorkout.name : 'Session'}</div>
+      </div>
+
+      <!-- Key stats -->
+      <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-3 text-center">
+          <div class="text-xl font-extrabold text-white">${fmt(totalSeconds)}</div>
+          <div class="text-[10px] text-gray-500 mt-0.5">Duration</div>
+        </div>
+        <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-3 text-center">
+          <div class="text-xl font-extrabold text-white">${currentExIdx + 1}</div>
+          <div class="text-[10px] text-gray-500 mt-0.5">Exercises</div>
+        </div>
+        <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-3 text-center">
+          <div class="text-xl font-extrabold text-hyrox-yellow">${wearableData ? wearableData.calories : Math.round(totalMins * 8)}</div>
+          <div class="text-[10px] text-gray-500 mt-0.5">Est. Cal</div>
+        </div>
+      </div>
+
+      ${trendHtml}
+
+      <div class="space-y-3 mt-4">
+        ${wearableCardHtml}
+        ${recoveryImpactHtml}
+        ${loadSparkHtml}
+      </div>
+
+      <!-- AI coach message -->
+      <div class="bg-gradient-to-br from-hyrox-yellow/10 to-hyrox-gray/50 border border-hyrox-yellow/30 rounded-xl p-4 mt-4">
+        <div class="flex items-start gap-3">
+          <div class="w-8 h-8 bg-hyrox-yellow rounded-lg flex items-center justify-center flex-shrink-0">
+            <span class="text-hyrox-dark font-extrabold text-[10px]">AI</span>
+          </div>
+          <p class="text-gray-300 text-xs leading-relaxed">${getPostWorkoutCoachMessage(meta, totalMins, recovery)}</p>
+        </div>
+      </div>
+
+      <button onclick="exitWorkout()" class="w-full mt-5 py-4 bg-hyrox-yellow text-hyrox-dark font-extrabold text-sm uppercase tracking-wider rounded-xl hover:bg-yellow-400 transition-colors">
+        Back to Training Plan
+      </button>
+    </div>`;
+
+  // Also hide the exercise list
+  const listEl = document.getElementById('exercise-list-mini');
+  if (listEl) listEl.innerHTML = '';
+}
+
+function getPostWorkoutCoachMessage(meta, totalMins, recovery) {
+  const messages = [];
+
+  if (meta.type === 'stations') {
+    messages.push(
+      `Solid station work! ${totalMins} minutes building Hyrox-specific strength.`,
+      `Great station session. Consistency here is what separates PB chasers from dreamers.`,
+      `${totalMins} min of station grinding done. Your race-day self will thank you.`
+    );
+  } else if (meta.type === 'run') {
+    messages.push(
+      `Nice run! ${totalMins} minutes of cardio that directly translates to faster transition times.`,
+      `Running is 60% of your Hyrox time. Every session like this shaves seconds on race day.`,
+      `${totalMins} min run logged. Keep this consistency and your 1km splits will drop.`
+    );
+  } else if (meta.type === 'sim') {
+    messages.push(
+      `Full simulation done! The closest thing to race day. You just built serious mental toughness.`,
+      `Sim sessions are gold. ${totalMins} min of race-pace experience you can't get any other way.`,
+    );
+  } else {
+    messages.push(
+      `${totalMins} minutes of work in the bank. One step closer to race day.`,
+      `Every session counts. You just invested ${totalMins} minutes in your Hyrox goal.`
+    );
+  }
+
+  let msg = messages[Math.floor(Math.random() * messages.length)];
+
+  if (recovery && recovery.zone.id === 'fatigued') {
+    msg += ' Your fatigue is building — make sure to prioritize sleep and nutrition tonight.';
+  } else if (recovery && recovery.zone.id === 'fresh') {
+    msg += ' You\'re recovering well. Ready to push again tomorrow!';
+  }
+
+  return msg;
+}
+
+function getPostWorkoutWearableData(meta, totalSeconds) {
+  // Check if wearable is connected
+  const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  if (!user) return null;
+  const connectedDevice = user.connectedWearables ? Object.keys(user.connectedWearables).find(k => user.connectedWearables[k]) : null;
+  if (!connectedDevice) return null;
+
+  const totalMins = totalSeconds / 60;
+
+  // Simulate realistic workout data based on type and duration
+  const baseHR = meta.type === 'sim' ? 155 : meta.type === 'run' ? 150 : meta.type === 'stations' ? 140 : 135;
+  const hrVariance = 10 + Math.floor(Math.random() * 10);
+  const avgHR = baseHR + Math.floor(Math.random() * hrVariance) - hrVariance / 2;
+  const maxHR = avgHR + 20 + Math.floor(Math.random() * 15);
+
+  // HR zones distribution based on workout type
+  const zones = {
+    stations: [5, 15, 35, 35, 10],   // more time in Z3-Z4
+    run:      [5, 10, 25, 40, 20],    // more time in Z4-Z5
+    sim:      [3, 8, 25, 40, 24],     // heavy Z4-Z5
+    strength: [10, 25, 40, 20, 5],    // mostly Z2-Z3
+  };
+  const zoneDistrib = zones[meta.type] || zones.stations;
+  // Add some random variance
+  const hrZones = [
+    { label: 'Z1', pct: Math.max(2, zoneDistrib[0] + Math.floor(Math.random() * 6 - 3)), color: 'bg-gray-400', textColor: 'text-gray-400' },
+    { label: 'Z2', pct: Math.max(5, zoneDistrib[1] + Math.floor(Math.random() * 6 - 3)), color: 'bg-blue-400', textColor: 'text-blue-400' },
+    { label: 'Z3', pct: Math.max(10, zoneDistrib[2] + Math.floor(Math.random() * 8 - 4)), color: 'bg-green-400', textColor: 'text-green-400' },
+    { label: 'Z4', pct: Math.max(10, zoneDistrib[3] + Math.floor(Math.random() * 8 - 4)), color: 'bg-orange-400', textColor: 'text-orange-400' },
+    { label: 'Z5', pct: 0, color: 'bg-red-500', textColor: 'text-red-400' },
+  ];
+  // Make Z5 fill remainder to 100%
+  const usedPct = hrZones.slice(0, 4).reduce((s, z) => s + z.pct, 0);
+  hrZones[4].pct = Math.max(2, 100 - usedPct);
+
+  // Calories estimate
+  const calPerMin = meta.type === 'sim' ? 12 : meta.type === 'run' ? 11 : meta.type === 'stations' ? 9 : 8;
+  const calories = Math.round(totalMins * calPerMin + Math.random() * 30);
+
+  // Training effect (Garmin-style 1.0-5.0)
+  const teBase = meta.type === 'sim' ? 4.0 : meta.type === 'run' ? 3.5 : 3.0;
+  const trainingEffect = (teBase + Math.random() * 0.8 - 0.4).toFixed(1);
+
+  const deviceLabels = {
+    garmin: 'Garmin', whoop: 'WHOOP', oura: 'Oura', luna: 'Luna', apple_health: 'Apple Health'
+  };
+
+  return {
+    device: connectedDevice,
+    deviceLabel: deviceLabels[connectedDevice] || connectedDevice,
+    avgHR,
+    maxHR,
+    hrZones,
+    calories,
+    trainingEffect,
+  };
 }
 
 // ============================================================

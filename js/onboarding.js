@@ -122,6 +122,7 @@ const ONBOARDING_STEPS = [
       { id: 'whoop', name: 'WHOOP', color: 'red' },
       { id: 'oura', name: 'Oura Ring', color: 'purple' },
       { id: 'luna', name: 'Luna Ring', color: 'teal' },
+      { id: 'noisefit', name: 'NoiseFit', color: 'orange' },
     ],
   },
   {

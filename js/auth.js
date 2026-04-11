@@ -227,6 +227,7 @@ const WEARABLE_ICONS = {
   whoop: `<svg viewBox="0 0 24 24" class="w-6 h-6"><circle cx="12" cy="12" r="9" fill="none" stroke="#00F19F" stroke-width="2.5"/><path d="M8 12h8" stroke="#00F19F" stroke-width="2.5" stroke-linecap="round"/></svg>`,
   oura: `<svg viewBox="0 0 24 24" class="w-6 h-6"><circle cx="12" cy="12" r="8" fill="none" stroke="#2A72DE" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="#2A72DE" stroke-width="1.5"/></svg>`,
   luna: `<svg viewBox="0 0 24 24" class="w-6 h-6"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" fill="none" stroke="#5EEAD4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  noisefit: `<svg viewBox="0 0 24 24" class="w-6 h-6"><circle cx="12" cy="12" r="9" fill="none" stroke="#FF6B35" stroke-width="2"/><path d="M8 14l2-4 2 4 2-4 2 4" stroke="#FF6B35" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
 };
 
 const WEARABLES = {
@@ -235,6 +236,7 @@ const WEARABLES = {
   whoop: { name: 'WHOOP', icon: WEARABLE_ICONS.whoop, color: 'red', desc: 'Import strain, recovery, and sleep scores from your WHOOP band.' },
   oura: { name: 'Oura Ring', icon: WEARABLE_ICONS.oura, color: 'purple', desc: 'Track sleep quality, readiness, and activity from Oura.' },
   luna: { name: 'Luna Ring', icon: WEARABLE_ICONS.luna, color: 'teal', desc: 'Sync sleep, stress, and wellness metrics from Luna Ring.' },
+  noisefit: { name: 'NoiseFit', icon: WEARABLE_ICONS.noisefit, color: 'orange', desc: 'Import workouts, heart rate, and SpO2 data from NoiseFit smartwatches.' },
 };
 
 let wearableActivities = [];
