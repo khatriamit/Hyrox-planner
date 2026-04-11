@@ -738,14 +738,8 @@ function finishOnboarding() {
   syncUIFromState();
   recalculate();
 
-  // Route based on user type
-  if (onboardingData.goal === 'first_race') {
-    // First timers → show Stations tab (they don't have a PB to import)
-    showTab('stations');
-  } else {
-    // Returning athletes → Import PB tab to pull their data
-    showTab('import');
-  }
+  // Route to Train tab — it's the primary experience
+  showTab('train');
 
   // If they selected a wearable, open the wearable modal
   if (onboardingData.wearable) {

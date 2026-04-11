@@ -468,6 +468,18 @@ function getWearableSleepData() {
   const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
   if (!user) return null;
 
+  // Check Apple Health imported data first (real data takes priority)
+  if (user.wearables?.apple_health?.connected && user.wearables.apple_health.dataSource === 'xml_import') {
+    const sleepKey = 'hyrox_sleep_apple_health';
+    try {
+      const raw = localStorage.getItem(sleepKey);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data.hasData) return data;
+      }
+    } catch (_) {}
+  }
+
   const connectedDevice = user.connectedWearables ? Object.keys(user.connectedWearables).find(k => user.connectedWearables[k]) : null;
   if (!connectedDevice) return null;
 
@@ -942,19 +954,29 @@ function renderWeekSessions(week, recovery) {
     race: '🏁',
   };
 
+  // Load any user swaps for today
+  const swaps = typeof loadSwaps === 'function' ? loadSwaps() : {};
+  const todayDateKey = new Date().toISOString().split('T')[0];
+
   return week.sessions.map(s => {
     const isToday = dayMap[s.day] === today;
     const isRest = s.type === 'rest';
     const isRace = s.type === 'race';
 
-    // Apply recovery adaptation for today's session
-    let displaySession = s;
+    // Check for user swap first
+    const swapKey = todayDateKey + '_' + s.day;
+    const userSwap = isToday ? swaps[swapKey] : null;
+    let displaySession = userSwap ? { ...s, ...userSwap, _original: s } : s;
     let adaptedBadge = '';
-    if (isToday && recovery && !isRest && !isRace) {
+    let swapBadge = '';
+
+    if (userSwap) {
+      swapBadge = `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-semibold">↔ SWAPPED</span>`;
+    } else if (isToday && recovery && !isRest && !isRace) {
+      // Apply recovery adaptation only if no manual swap
       const adapted = getAdaptedSession(s, recovery);
       displaySession = adapted.session;
       if (adapted.adapted) {
-        const isSwappedToRest = displaySession.type === 'rest';
         adaptedBadge = `<span class="text-[9px] px-1.5 py-0.5 rounded-full ${
           recovery.zone.id === 'fresh' ? 'bg-green-500/20 text-green-400' :
           recovery.zone.id === 'overreached' ? 'bg-red-500/20 text-red-400' :
@@ -965,20 +987,30 @@ function renderWeekSessions(week, recovery) {
 
     const ds = displaySession;
     const dsIsRest = ds.type === 'rest';
+    const originalSession = userSwap ? s : ds;
+
+    // Swap button for today's session
+    const swapBtn = isToday && !isRace ? `
+      <button onclick="event.stopPropagation(); showSwapModal('${s.day}', ${JSON.stringify({ label: s.label, type: s.type, duration: s.duration, intensity: s.intensity || '' }).replace(/"/g, '&quot;')})"
+        class="w-7 h-7 bg-hyrox-dark rounded-lg flex items-center justify-center hover:bg-hyrox-gray transition-colors flex-shrink-0" title="Swap workout">
+        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+        </svg>
+      </button>` : '';
 
     return `
-      <button onclick="${dsIsRest || isRace ? '' : `startDayWorkout('${ds.type}', '${ds.focus || ''}')`}"
-        class="w-full text-left bg-hyrox-gray/50 border ${isToday ? 'border-hyrox-yellow' : isRace ? 'border-purple-500' : 'border-hyrox-gray'} rounded-xl p-4 ${dsIsRest && !isToday ? 'opacity-50' : 'hover:border-hyrox-yellow/30'} transition-colors">
+      <div class="w-full text-left bg-hyrox-gray/50 border ${isToday ? 'border-hyrox-yellow' : isRace ? 'border-purple-500' : 'border-hyrox-gray'} rounded-xl p-4 ${dsIsRest && !isToday ? 'opacity-50' : 'hover:border-hyrox-yellow/30'} transition-colors">
         <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-10 text-center">
+          <div class="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onclick="${dsIsRest || isRace ? '' : `startDayWorkout('${ds.type}', '${ds.focus || ''}')`}">
+            <div class="w-10 text-center flex-shrink-0">
               <div class="text-xs font-bold ${isToday ? 'text-hyrox-yellow' : 'text-gray-400'}">${s.day}</div>
               ${isToday ? '<div class="text-[9px] text-hyrox-yellow">TODAY</div>' : ''}
             </div>
-            <div>
-              <div class="font-semibold text-sm flex items-center gap-2">
+            <div class="min-w-0">
+              <div class="font-semibold text-sm flex items-center gap-2 flex-wrap">
                 <span>${typeIcons[ds.type] || ''}</span>
                 ${ds.label}
+                ${swapBadge}
                 ${adaptedBadge}
                 ${isRace ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 font-bold animate-pulse">RACE DAY</span>' : ''}
               </div>
@@ -990,9 +1022,12 @@ function renderWeekSessions(week, recovery) {
               <div class="text-[10px] text-gray-500 mt-1">${ds.desc}</div>
             </div>
           </div>
-          ${!dsIsRest && !isRace ? '<svg class="w-5 h-5 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>' : ''}
+          <div class="flex items-center gap-1.5 flex-shrink-0">
+            ${swapBtn}
+            ${!dsIsRest && !isRace ? `<div onclick="${`startDayWorkout('${ds.type}', '${ds.focus || ''}')`}" class="cursor-pointer"><svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></div>` : ''}
+          </div>
         </div>
-      </button>`;
+      </div>`;
   }).join('');
 }
 
@@ -1066,4 +1101,123 @@ function closePlanWeekDetail() {
   const detail = document.getElementById('week-detail-view');
   detail.classList.add('hidden');
   detail.innerHTML = '';
+}
+
+// ============================================================
+// Workout Swap — let users change today's session
+// ============================================================
+const SWAP_STORAGE_KEY = 'hyrox_swaps';
+
+const SWAP_OPTIONS = [
+  { id: 'easy_run', label: 'Easy Run', type: 'run', intensity: 'easy', duration: 30, desc: 'Zone 2 easy pace — build base without fatigue', icon: '🏃' },
+  { id: 'station_technique', label: 'Station Technique', type: 'stations', focus: 'weak', intensity: 'moderate', duration: 40, desc: 'Practice form on your weakest stations', icon: '🏋️' },
+  { id: 'interval_run', label: 'Interval Run', type: 'run', intensity: 'high', duration: 35, desc: '1km repeats at race pace with recovery jogs', icon: '⚡' },
+  { id: 'strength', label: 'Strength Training', type: 'strength', intensity: 'moderate', duration: 45, desc: 'Full body compound lifts for Hyrox power', icon: '💪' },
+  { id: 'half_sim', label: 'Half Simulation', type: 'sim', intensity: 'high', duration: 55, desc: '4 stations + 4 runs at race effort', icon: '🔄' },
+  { id: 'mobility', label: 'Mobility & Recovery', type: 'rest', intensity: 'low', duration: 25, desc: 'Foam rolling, stretching, joint mobility', icon: '🧘' },
+  { id: 'tempo_run', label: 'Tempo Run', type: 'run', intensity: 'moderate', duration: 40, desc: 'Sustained effort at 80-85% race pace', icon: '🏃‍♂️' },
+  { id: 'rest_day', label: 'Rest Day', type: 'rest', intensity: '', duration: 0, desc: 'Full recovery — sleep, nutrition, hydrate', icon: '😴' },
+];
+
+function loadSwaps() {
+  try {
+    const raw = localStorage.getItem(SWAP_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (_) { return {}; }
+}
+
+function saveSwap(dayKey, swapSession) {
+  const swaps = loadSwaps();
+  swaps[dayKey] = { ...swapSession, swappedAt: Date.now() };
+  localStorage.setItem(SWAP_STORAGE_KEY, JSON.stringify(swaps));
+}
+
+function clearSwap(dayKey) {
+  const swaps = loadSwaps();
+  delete swaps[dayKey];
+  localStorage.setItem(SWAP_STORAGE_KEY, JSON.stringify(swaps));
+}
+
+function getTodaySwapKey() {
+  return new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+}
+
+function showSwapModal(dayName, originalSession) {
+  const dayKey = getTodaySwapKey() + '_' + dayName;
+  const swaps = loadSwaps();
+  const currentSwap = swaps[dayKey];
+
+  const modal = document.createElement('div');
+  modal.id = 'swap-modal';
+  modal.className = 'fixed inset-0 bg-black/80 z-50 flex items-end justify-center';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+  const typeIcons = { stations: '🏋️', run: '🏃', sim: '🔄', strength: '💪', rest: '😴' };
+
+  modal.innerHTML = `
+    <div class="w-full max-w-lg bg-hyrox-dark border-t border-hyrox-gray rounded-t-2xl p-6 max-h-[80vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-extrabold">Swap Today's Workout</h3>
+        <button onclick="document.getElementById('swap-modal').remove()" class="w-8 h-8 bg-hyrox-gray rounded-lg flex items-center justify-center">
+          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Current planned session -->
+      <div class="bg-hyrox-gray/30 border border-hyrox-gray rounded-xl p-3 mb-4">
+        <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Planned</div>
+        <div class="flex items-center gap-2">
+          <span>${typeIcons[originalSession.type] || '📋'}</span>
+          <span class="font-semibold text-sm">${originalSession.label}</span>
+          <span class="text-[10px] text-gray-500">${originalSession.duration} min · ${originalSession.intensity || ''}</span>
+        </div>
+      </div>
+
+      ${currentSwap ? `
+        <button onclick="revertSwap('${dayKey}', '${dayName}')" class="w-full mb-4 py-2.5 bg-hyrox-gray border border-hyrox-yellow/30 rounded-xl text-xs font-semibold text-hyrox-yellow hover:bg-hyrox-yellow/10 transition-colors flex items-center justify-center gap-2">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+          Revert to Original Plan
+        </button>` : ''}
+
+      <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Swap to:</div>
+      <div class="space-y-2">
+        ${SWAP_OPTIONS.map(opt => `
+          <button onclick="applySwap('${dayKey}', '${dayName}', '${opt.id}')"
+            class="w-full text-left p-3 rounded-xl border transition-all ${currentSwap && currentSwap.id === opt.id ? 'border-hyrox-yellow bg-hyrox-yellow/10' : 'border-hyrox-gray bg-hyrox-gray/30 hover:border-hyrox-yellow/50'}">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 bg-hyrox-dark rounded-lg flex items-center justify-center text-lg flex-shrink-0">${opt.icon}</div>
+              <div class="flex-1">
+                <div class="font-semibold text-sm">${opt.label}</div>
+                <div class="text-gray-500 text-[10px]">${opt.duration > 0 ? opt.duration + ' min · ' : ''}${opt.intensity || 'Recovery'}</div>
+                <div class="text-gray-400 text-[10px] mt-0.5">${opt.desc}</div>
+              </div>
+              ${currentSwap && currentSwap.id === opt.id ? '<div class="w-5 h-5 bg-hyrox-yellow rounded-full flex items-center justify-center"><svg class="w-3 h-3 text-hyrox-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg></div>' : ''}
+            </div>
+          </button>
+        `).join('')}
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+}
+
+function applySwap(dayKey, dayName, swapId) {
+  const opt = SWAP_OPTIONS.find(o => o.id === swapId);
+  if (!opt) return;
+  saveSwap(dayKey, { ...opt, day: dayName });
+  document.getElementById('swap-modal')?.remove();
+
+  // Re-render the plan
+  if (state.raceDate && typeof renderPeriodizedPlan === 'function') {
+    renderPeriodizedPlan();
+  }
+}
+
+function revertSwap(dayKey, dayName) {
+  clearSwap(dayKey);
+  document.getElementById('swap-modal')?.remove();
+
+  if (state.raceDate && typeof renderPeriodizedPlan === 'function') {
+    renderPeriodizedPlan();
+  }
 }

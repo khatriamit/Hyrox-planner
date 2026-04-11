@@ -38,7 +38,7 @@ function resetAll() {
 // ============================================================
 // Tab Navigation
 // ============================================================
-const TABS = ['import', 'setup', 'stations', 'analysis', 'train', 'raceday'];
+const TABS = ['train', 'import', 'setup', 'stations', 'analysis', 'raceday'];
 
 function showTab(tab) {
   TABS.forEach(t => {
@@ -404,6 +404,7 @@ async function searchAthlete() {
 
   statusEl.classList.remove('hidden');
   resultsEl.innerHTML = '';
+  resultsEl.classList.remove('hidden');
   splitsEl.classList.add('hidden');
   btn.disabled = true;
   btn.textContent = 'Searching...';
@@ -426,7 +427,7 @@ async function searchAthlete() {
 
     statusEl.classList.add('hidden');
     btn.disabled = false;
-    btn.textContent = 'Search Hyrox Results';
+    btn.textContent = 'Show Results';
 
     if (data.error) {
       resultsEl.innerHTML = `<div class="text-center text-red-400 text-sm py-4">Error: ${data.error}</div>`;
@@ -442,26 +443,34 @@ async function searchAthlete() {
       return;
     }
 
-    // Hyrox-style results table
+    // Hyrox official-style results table
     resultsEl.innerHTML = `
-      <div class="text-gray-400 text-xs mb-2">${data.count} result${data.count !== 1 ? 's' : ''} found</div>
-      <div class="border border-hyrox-gray/50 overflow-hidden">
-        <table class="w-full text-sm">
+      <div class="flex justify-between items-center mb-2">
+        <div class="text-gray-400 text-xs">${data.count} result${data.count !== 1 ? 's' : ''}</div>
+        <div class="text-gray-600 text-[10px]">Click name for details</div>
+      </div>
+      <div class="border border-[#333] overflow-hidden">
+        <table class="w-full text-xs">
           <thead>
-            <tr class="bg-hyrox-gray/60 text-xs text-gray-300 uppercase tracking-wider">
-              <th class="text-left py-2 px-3 font-semibold w-14">Rank</th>
-              <th class="text-left py-2 px-3 font-semibold">Name</th>
-              <th class="text-left py-2 px-3 font-semibold hidden sm:table-cell">City</th>
-              <th class="text-right py-2 px-3 font-semibold w-20">Total</th>
+            <tr class="bg-[#222] text-[10px] text-gray-400 uppercase tracking-wider">
+              <th class="text-center py-2 px-2 font-semibold w-12">Rank</th>
+              <th class="text-left py-2 px-2 font-semibold">Name</th>
+              <th class="text-center py-2 px-2 font-semibold w-12 hidden sm:table-cell">Nat</th>
+              <th class="text-right py-2 px-2 font-semibold w-20 hidden sm:table-cell">Workout</th>
+              <th class="text-right py-2 px-2 font-semibold w-20">Totals</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-hyrox-gray/30">
-            ${data.athletes.map(a => `
-              <tr onclick='selectAthlete(${JSON.stringify(a).replace(/'/g, "&#39;")})' class="hover:bg-hyrox-gray/30 cursor-pointer transition-colors">
-                <td class="py-2.5 px-3 text-gray-400">${a.place || '-'}</td>
-                <td class="py-2.5 px-3"><span class="text-hyrox-yellow font-medium hover:underline">${a.name || 'Unknown'}</span></td>
-                <td class="py-2.5 px-3 text-gray-400 hidden sm:table-cell">${a.city || ''}</td>
-                <td class="py-2.5 px-3 text-right font-mono">${a.overall_time || '--:--'}</td>
+          <tbody class="divide-y divide-[#2a2a2a]">
+            ${data.athletes.map((a, i) => `
+              <tr onclick='selectAthlete(${JSON.stringify(a).replace(/'/g, "&#39;")})' class="${i % 2 === 0 ? 'bg-[#1a1a1a]' : 'bg-[#151515]'} hover:bg-[#252525] cursor-pointer transition-colors">
+                <td class="py-2.5 px-2 text-center text-gray-500 font-mono">${a.place || '-'}</td>
+                <td class="py-2.5 px-2">
+                  <span class="text-hyrox-yellow font-medium hover:underline">${a.name || 'Unknown'}</span>
+                  <span class="text-gray-600 text-[10px] sm:hidden block">${a.city || ''}</span>
+                </td>
+                <td class="py-2.5 px-2 text-center text-gray-500 hidden sm:table-cell">${a.nationality || a.city?.substring(0, 3)?.toUpperCase() || '—'}</td>
+                <td class="py-2.5 px-2 text-right font-mono text-gray-400 hidden sm:table-cell">${a.workout_time || '--:--'}</td>
+                <td class="py-2.5 px-2 text-right font-mono font-semibold">${a.overall_time || '--:--'}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -489,10 +498,11 @@ async function selectAthlete(athlete) {
     return;
   }
 
-  // Show loading in splits area
+  // Show loading in splits area, hide results table
   splitsEl.classList.remove('hidden');
+  document.getElementById('search-results').classList.add('hidden');
   document.getElementById('pb-participant-info').innerHTML = `<div class="text-gray-400 text-sm">${athlete.name || 'Loading...'}</div>`;
-  listEl.innerHTML = `<tr><td colspan="2" class="py-4 text-center text-gray-400 text-sm">Loading splits...</td></tr>`;
+  listEl.innerHTML = `<tr><td colspan="3" class="py-4 text-center text-gray-400 text-sm">Loading splits...</td></tr>`;
 
   try {
     const resp = await fetch(`/api/athlete?url=${encodeURIComponent(athlete.detail_url)}`);
@@ -506,47 +516,82 @@ async function selectAthlete(athlete) {
     pendingPBSplits = data.splits;
     pendingPBName = athlete.name || '';
 
-    // Populate participant info
+    const overallTime = data.splits.overall ? fmt(data.splits.overall) : '--:--';
+
+    // Populate participant info — Hyrox official style
     const infoEl = document.getElementById('pb-participant-info');
     infoEl.innerHTML = `
-      <div class="flex justify-between"><span class="text-gray-400">Name</span><span>${athlete.name || ''}</span></div>
-      <div class="flex justify-between"><span class="text-gray-400">City</span><span>${athlete.city || ''}</span></div>
-      ${data.splits.overall ? `<div class="flex justify-between"><span class="text-gray-400">Total</span><span class="text-hyrox-yellow font-bold">${fmt(data.splits.overall)}</span></div>` : ''}
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-10 h-10 bg-hyrox-yellow/20 rounded-full flex items-center justify-center text-hyrox-yellow font-bold text-lg">${(athlete.name || 'A').charAt(0)}</div>
+        <div>
+          <div class="font-bold text-white text-base">${athlete.name || ''}</div>
+          <div class="text-gray-500 text-xs">${athlete.city || ''} ${athlete.nationality ? '· ' + athlete.nationality : ''}</div>
+        </div>
+        <div class="ml-auto text-right">
+          <div class="text-hyrox-yellow font-mono font-bold text-lg">${overallTime}</div>
+          <div class="text-gray-500 text-[10px] uppercase">Total Time</div>
+        </div>
+      </div>
     `;
 
     // Map station icons
     const stationInfo = {};
     STATIONS.forEach(s => { stationInfo[s.id] = { icon: s.icon, name: s.name }; });
 
-    // Build splits as table rows (Hyrox style: Split | Time)
+    // Build splits as table rows — Hyrox official format: Split | Time | % of total
     const stationIds = ['ski_erg', 'sled_push', 'sled_pull', 'burpee_broad_jump', 'rowing', 'farmers_carry', 'sandbag_lunges', 'wall_balls'];
     let html = '';
+    const totalSec = data.splits.overall || 1;
+    let rowIdx = 0;
 
     // Interleave runs and stations like the real Hyrox page
     for (let i = 0; i < 8; i++) {
       const runKey = `run_${i + 1}`;
       if (data.splits[runKey]) {
-        html += `<tr><td class="py-1.5 text-gray-400">Running ${i + 1}</td><td class="py-1.5 text-right font-mono">${fmt(data.splits[runKey])}</td></tr>`;
+        const pct = ((data.splits[runKey] / totalSec) * 100).toFixed(1);
+        const rowBg = rowIdx % 2 === 0 ? 'bg-[#1a1a1a]' : 'bg-[#151515]';
+        html += `<tr class="${rowBg}">
+          <td class="py-2 px-3 text-gray-400"><span class="text-gray-600 mr-1">🏃</span> Running ${i + 1}</td>
+          <td class="py-2 px-3 text-right font-mono text-gray-300">${fmt(data.splits[runKey])}</td>
+          <td class="py-2 px-3 text-right font-mono text-gray-600 text-[10px] hidden sm:table-cell">${pct}%</td>
+        </tr>`;
+        rowIdx++;
       }
       const stId = stationIds[i];
       if (data.splits[stId]) {
-        const info = stationInfo[stId] || { name: stId };
-        html += `<tr><td class="py-1.5">${info.name}</td><td class="py-1.5 text-right font-mono text-hyrox-yellow font-bold">${fmt(data.splits[stId])}</td></tr>`;
+        const info = stationInfo[stId] || { name: stId, icon: '🏋️' };
+        const pct = ((data.splits[stId] / totalSec) * 100).toFixed(1);
+        const rowBg = rowIdx % 2 === 0 ? 'bg-[#1a1a1a]' : 'bg-[#151515]';
+        html += `<tr class="${rowBg}">
+          <td class="py-2 px-3 font-medium"><span class="mr-1">${info.icon || '🏋️'}</span> ${info.name}</td>
+          <td class="py-2 px-3 text-right font-mono text-hyrox-yellow font-semibold">${fmt(data.splits[stId])}</td>
+          <td class="py-2 px-3 text-right font-mono text-gray-600 text-[10px] hidden sm:table-cell">${pct}%</td>
+        </tr>`;
+        rowIdx++;
       }
     }
 
     // Roxzone
     if (data.splits.roxzone) {
-      html += `<tr><td class="py-1.5 text-gray-400">Roxzone Time</td><td class="py-1.5 text-right font-mono">${fmt(data.splits.roxzone)}</td></tr>`;
+      const pct = ((data.splits.roxzone / totalSec) * 100).toFixed(1);
+      html += `<tr class="bg-[#1a1a1a] border-t border-[#333]">
+        <td class="py-2 px-3 text-gray-400">⏱ Roxzone Time</td>
+        <td class="py-2 px-3 text-right font-mono text-gray-300">${fmt(data.splits.roxzone)}</td>
+        <td class="py-2 px-3 text-right font-mono text-gray-600 text-[10px] hidden sm:table-cell">${pct}%</td>
+      </tr>`;
     }
 
     // Overall
     if (data.splits.overall) {
-      html += `<tr class="border-t border-hyrox-yellow/30"><td class="py-2 font-bold">Overall</td><td class="py-2 text-right font-mono font-bold text-hyrox-yellow text-base">${fmt(data.splits.overall)}</td></tr>`;
+      html += `<tr class="bg-hyrox-yellow/5 border-t-2 border-hyrox-yellow/50">
+        <td class="py-3 px-3 font-extrabold uppercase text-sm tracking-wider">Total</td>
+        <td class="py-3 px-3 text-right font-mono font-extrabold text-hyrox-yellow text-base">${fmt(data.splits.overall)}</td>
+        <td class="py-3 px-3 text-right font-mono text-hyrox-yellow text-[10px] hidden sm:table-cell">100%</td>
+      </tr>`;
     }
 
     if (!html) {
-      html = `<tr><td colspan="2" class="py-4 text-center text-gray-400">No detailed splits found.</td></tr>`;
+      html = `<tr><td colspan="3" class="py-4 text-center text-gray-400">No detailed splits found.</td></tr>`;
     }
 
     listEl.innerHTML = html;
@@ -591,7 +636,7 @@ function importPB() {
   saveState();
   syncUIFromState();
   recalculate();
-  showTab('setup');
+  showTab('train');
 }
 
 // Allow Enter key to trigger search

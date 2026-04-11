@@ -345,15 +345,14 @@ async function connectWearableOAuth(deviceId) {
     return connectStravaOAuth();
   }
 
-  // For devices that need native apps (Apple Health) or business API partnerships
-  const nativeOnly = ['apple_health'];
-  const needsStrava = ['garmin', 'whoop', 'oura', 'luna', 'noisefit'];
-
-  if (nativeOnly.includes(deviceId)) {
-    showWearableConnectHelp(deviceId, 'native');
+  // Apple Health has a special XML import flow
+  if (deviceId === 'apple_health') {
+    showAppleHealthConnect();
     return;
   }
 
+  // Devices that sync via Strava
+  const needsStrava = ['garmin', 'whoop', 'oura', 'luna', 'noisefit'];
   if (needsStrava.includes(deviceId)) {
     showWearableConnectHelp(deviceId, 'strava');
     return;
@@ -444,6 +443,536 @@ function showWearableConnectHelp(deviceId, helpType) {
     </div>`;
 
   document.body.appendChild(modal);
+}
+
+// ============================================================
+// Apple Health — XML Export Import + Guided Flow
+// ============================================================
+
+function showAppleHealthConnect() {
+  const modal = document.createElement('div');
+  modal.id = 'apple-health-modal';
+  modal.className = 'fixed inset-0 bg-black/80 z-[60] flex items-end justify-center';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+  modal.innerHTML = `
+    <div class="w-full max-w-lg bg-hyrox-dark border-t border-hyrox-gray rounded-t-2xl p-6 max-h-[85vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-pink-500/20 rounded-xl flex items-center justify-center">
+            ${WEARABLE_ICONS.apple_health}
+          </div>
+          <div>
+            <div class="font-bold text-sm">Apple Health</div>
+            <div class="text-gray-500 text-[10px]">Import your health data</div>
+          </div>
+        </div>
+        <button onclick="document.getElementById('apple-health-modal').remove()" class="w-8 h-8 bg-hyrox-gray rounded-lg flex items-center justify-center">
+          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Option 1: Upload Export -->
+      <div class="bg-hyrox-gray/50 border border-pink-500/30 rounded-xl p-4 mb-3">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-lg">📂</span>
+          <span class="font-bold text-sm">Import Health Export</span>
+          <span class="ml-auto bg-pink-500/20 text-pink-400 text-[9px] font-bold px-2 py-0.5 rounded-full">RECOMMENDED</span>
+        </div>
+        <p class="text-gray-400 text-xs mb-3 leading-relaxed">Export your data from iPhone Health app and upload the XML file here. Gets sleep, heart rate, HRV, workouts & more.</p>
+
+        <div class="bg-hyrox-dark rounded-lg p-3 mb-3">
+          <div class="text-[10px] font-semibold text-hyrox-yellow mb-2">How to export:</div>
+          <div class="space-y-1.5">
+            <div class="flex items-start gap-2 text-[11px] text-gray-300">
+              <span class="text-hyrox-yellow font-bold">1.</span>
+              <span>Open <strong>Health</strong> app on your iPhone</span>
+            </div>
+            <div class="flex items-start gap-2 text-[11px] text-gray-300">
+              <span class="text-hyrox-yellow font-bold">2.</span>
+              <span>Tap your <strong>profile icon</strong> (top right)</span>
+            </div>
+            <div class="flex items-start gap-2 text-[11px] text-gray-300">
+              <span class="text-hyrox-yellow font-bold">3.</span>
+              <span>Scroll down → <strong>Export All Health Data</strong></span>
+            </div>
+            <div class="flex items-start gap-2 text-[11px] text-gray-300">
+              <span class="text-hyrox-yellow font-bold">4.</span>
+              <span>Save/AirDrop the <strong>export.zip</strong> to this device</span>
+            </div>
+            <div class="flex items-start gap-2 text-[11px] text-gray-300">
+              <span class="text-hyrox-yellow font-bold">5.</span>
+              <span>Unzip and upload the <strong>export.xml</strong> file below</span>
+            </div>
+          </div>
+        </div>
+
+        <label class="block cursor-pointer">
+          <input type="file" id="apple-health-file" accept=".xml,.zip" onchange="handleAppleHealthUpload(event)" class="hidden" />
+          <div class="w-full py-3 bg-pink-500/20 border-2 border-dashed border-pink-500/40 rounded-xl text-center hover:border-pink-500/70 transition-colors">
+            <div class="text-pink-400 font-bold text-sm">📱 Upload export.xml</div>
+            <div class="text-gray-500 text-[10px] mt-1">or drag & drop here</div>
+          </div>
+        </label>
+        <div id="apple-health-upload-status" class="mt-2 text-xs text-center"></div>
+      </div>
+
+      <!-- Option 2: iOS Shortcut -->
+      <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-4 mb-3">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-lg">⚡</span>
+          <span class="font-bold text-sm">Auto-Sync Shortcut</span>
+          <span class="ml-auto bg-blue-500/20 text-blue-400 text-[9px] font-bold px-2 py-0.5 rounded-full">iOS 16+</span>
+        </div>
+        <p class="text-gray-400 text-xs mb-3 leading-relaxed">Use an iOS Shortcut to automatically export your last 7 days of health data — runs daily in the background.</p>
+
+        <div class="bg-hyrox-dark rounded-lg p-3 mb-3">
+          <div class="text-[10px] font-semibold text-hyrox-yellow mb-2">Setup (1 min):</div>
+          <div class="space-y-1.5">
+            <div class="flex items-start gap-2 text-[11px] text-gray-300">
+              <span class="text-hyrox-yellow font-bold">1.</span>
+              <span>Open <strong>Shortcuts</strong> app on iPhone</span>
+            </div>
+            <div class="flex items-start gap-2 text-[11px] text-gray-300">
+              <span class="text-hyrox-yellow font-bold">2.</span>
+              <span>Create shortcut: <strong>Find Health Samples</strong> → <strong>Get Text from Input</strong> → <strong>Save File</strong></span>
+            </div>
+            <div class="flex items-start gap-2 text-[11px] text-gray-300">
+              <span class="text-hyrox-yellow font-bold">3.</span>
+              <span>Run shortcut, then upload the file above</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Option 3: Strava fallback -->
+      <div class="bg-hyrox-gray/50 border border-hyrox-gray rounded-xl p-4 mb-3">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-lg">🔄</span>
+          <span class="font-bold text-sm">Sync via Strava</span>
+        </div>
+        <p class="text-gray-400 text-xs mb-3 leading-relaxed">If you sync Apple Health → Strava, connect Strava to get your workout data automatically.</p>
+        <button onclick="document.getElementById('apple-health-modal').remove(); connectWearableOAuth('strava')" class="w-full py-2.5 bg-[#FC4C02] text-white font-bold text-xs rounded-xl hover:opacity-90 transition-colors">
+          Connect Strava Instead
+        </button>
+      </div>
+
+      <!-- Option 4: Demo -->
+      <button onclick="document.getElementById('apple-health-modal').remove(); connectWearableDemo('apple_health')" class="w-full py-2.5 bg-hyrox-gray border border-hyrox-gray text-gray-400 font-semibold text-xs rounded-xl hover:border-hyrox-yellow transition-colors">
+        Use Demo Data
+      </button>
+    </div>`;
+
+  document.body.appendChild(modal);
+
+  // Enable drag & drop
+  const dropZone = modal.querySelector('label');
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-pink-500'); });
+  dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('border-pink-500'); });
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('border-pink-500');
+    const file = e.dataTransfer.files[0];
+    if (file) processAppleHealthFile(file);
+  });
+}
+
+async function handleAppleHealthUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  processAppleHealthFile(file);
+}
+
+async function processAppleHealthFile(file) {
+  const statusEl = document.getElementById('apple-health-upload-status');
+  statusEl.innerHTML = '<span class="text-hyrox-yellow">⏳ Processing file...</span>';
+
+  try {
+    let xmlText;
+
+    if (file.name.endsWith('.zip')) {
+      // Handle ZIP file — we need to extract export.xml
+      statusEl.innerHTML = '<span class="text-yellow-400">📦 Reading ZIP file... (for large exports, please unzip first and upload export.xml)</span>';
+      // Try to read as text — if it's actually a zip, this won't work well
+      // We'll recommend unzipping first
+      statusEl.innerHTML = '<span class="text-orange-400">⚠️ Please unzip the file first and upload the <strong>export.xml</strong> file inside.</span>';
+      return;
+    }
+
+    // Read XML file
+    statusEl.innerHTML = '<span class="text-hyrox-yellow">⏳ Reading XML... (this may take a moment for large files)</span>';
+    xmlText = await file.text();
+
+    statusEl.innerHTML = '<span class="text-hyrox-yellow">⏳ Parsing health data...</span>';
+
+    // Parse Apple Health XML
+    const healthData = parseAppleHealthXML(xmlText);
+
+    if (!healthData || healthData.totalRecords === 0) {
+      statusEl.innerHTML = '<span class="text-red-400">❌ No health data found in file. Make sure this is an Apple Health export.xml</span>';
+      return;
+    }
+
+    // Save parsed data
+    saveAppleHealthData(healthData);
+
+    // Mark as connected
+    const user = getCurrentUser();
+    const wearables = user?.wearables || {};
+    wearables.apple_health = {
+      connected: true,
+      displayName: 'Apple Health',
+      connectedAt: new Date().toISOString(),
+      isDemo: false,
+      dataSource: 'xml_import',
+      lastImport: new Date().toISOString(),
+      stats: {
+        sleepRecords: healthData.sleep.length,
+        hrRecords: healthData.heartRate.length,
+        hrvRecords: healthData.hrv.length,
+        workouts: healthData.workouts.length,
+      }
+    };
+    updateUser({ wearables, connectedWearables: { ...user?.connectedWearables, apple_health: true } });
+
+    statusEl.innerHTML = `
+      <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-left">
+        <div class="text-green-400 font-bold text-sm mb-1">✅ Health data imported!</div>
+        <div class="grid grid-cols-2 gap-1 text-[10px] text-gray-300">
+          <span>🛏 Sleep records: <strong>${healthData.sleep.length}</strong></span>
+          <span>❤️ HR samples: <strong>${healthData.heartRate.length}</strong></span>
+          <span>💓 HRV records: <strong>${healthData.hrv.length}</strong></span>
+          <span>🏃 Workouts: <strong>${healthData.workouts.length}</strong></span>
+          <span>👣 Steps days: <strong>${healthData.steps.length}</strong></span>
+          <span>🔥 Active cal: <strong>${healthData.activeCalories.length}</strong></span>
+        </div>
+      </div>`;
+
+    // Close modal after 2s and refresh
+    setTimeout(() => {
+      document.getElementById('apple-health-modal')?.remove();
+      activeWearableId = 'apple_health';
+      renderWearableHub();
+    }, 2000);
+
+  } catch (err) {
+    console.error('Apple Health parse error:', err);
+    statusEl.innerHTML = `<span class="text-red-400">❌ Error parsing file: ${err.message}</span>`;
+  }
+}
+
+function parseAppleHealthXML(xmlText) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlText, 'text/xml');
+
+  const parseError = doc.querySelector('parsererror');
+  if (parseError) {
+    throw new Error('Invalid XML file');
+  }
+
+  const records = doc.querySelectorAll('Record');
+  const workoutEls = doc.querySelectorAll('Workout');
+
+  const data = {
+    sleep: [],
+    heartRate: [],
+    hrv: [],
+    restingHR: [],
+    steps: [],
+    activeCalories: [],
+    workouts: [],
+    bodyMass: [],
+    vo2Max: [],
+    totalRecords: records.length + workoutEls.length,
+  };
+
+  // Only process last 90 days of data for performance
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 90);
+
+  records.forEach(rec => {
+    const type = rec.getAttribute('type');
+    const startStr = rec.getAttribute('startDate');
+    const endStr = rec.getAttribute('endDate');
+    const value = parseFloat(rec.getAttribute('value'));
+    const unit = rec.getAttribute('unit');
+
+    if (!startStr) return;
+    const startDate = new Date(startStr);
+    if (startDate < cutoff) return;
+
+    const endDate = endStr ? new Date(endStr) : startDate;
+
+    switch (type) {
+      case 'HKCategoryTypeIdentifierSleepAnalysis': {
+        const sleepValue = rec.getAttribute('value');
+        // InBed, Asleep, AsleepCore, AsleepDeep, AsleepREM, Awake
+        if (sleepValue && sleepValue !== 'HKCategoryValueSleepAnalysisInBed') {
+          const durationMin = (endDate - startDate) / 60000;
+          const dateKey = startDate.toISOString().split('T')[0];
+          data.sleep.push({
+            date: dateKey,
+            stage: sleepValue.replace('HKCategoryValueSleepAnalysis', ''),
+            durationMin: Math.round(durationMin),
+            start: startDate.toISOString(),
+            end: endDate.toISOString(),
+          });
+        }
+        break;
+      }
+      case 'HKQuantityTypeIdentifierHeartRate':
+        if (!isNaN(value)) {
+          data.heartRate.push({
+            date: startDate.toISOString().split('T')[0],
+            time: startDate.toISOString(),
+            value: Math.round(value),
+          });
+        }
+        break;
+      case 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN':
+        if (!isNaN(value)) {
+          data.hrv.push({
+            date: startDate.toISOString().split('T')[0],
+            value: Math.round(value),
+          });
+        }
+        break;
+      case 'HKQuantityTypeIdentifierRestingHeartRate':
+        if (!isNaN(value)) {
+          data.restingHR.push({
+            date: startDate.toISOString().split('T')[0],
+            value: Math.round(value),
+          });
+        }
+        break;
+      case 'HKQuantityTypeIdentifierStepCount':
+        if (!isNaN(value)) {
+          const dateKey = startDate.toISOString().split('T')[0];
+          data.steps.push({ date: dateKey, value: Math.round(value) });
+        }
+        break;
+      case 'HKQuantityTypeIdentifierActiveEnergyBurned':
+        if (!isNaN(value)) {
+          const dateKey = startDate.toISOString().split('T')[0];
+          data.activeCalories.push({ date: dateKey, value: Math.round(value) });
+        }
+        break;
+      case 'HKQuantityTypeIdentifierBodyMass':
+        if (!isNaN(value)) {
+          data.bodyMass.push({ date: startDate.toISOString().split('T')[0], value, unit });
+        }
+        break;
+      case 'HKQuantityTypeIdentifierVO2Max':
+        if (!isNaN(value)) {
+          data.vo2Max.push({ date: startDate.toISOString().split('T')[0], value });
+        }
+        break;
+    }
+  });
+
+  // Parse workouts
+  workoutEls.forEach(w => {
+    const activityType = w.getAttribute('workoutActivityType') || '';
+    const startStr = w.getAttribute('startDate');
+    const endStr = w.getAttribute('endDate');
+    const duration = parseFloat(w.getAttribute('duration'));
+    const calories = parseFloat(w.getAttribute('totalEnergyBurned'));
+    const distance = parseFloat(w.getAttribute('totalDistance'));
+
+    if (!startStr) return;
+    const startDate = new Date(startStr);
+    if (startDate < cutoff) return;
+
+    data.workouts.push({
+      date: startDate.toISOString().split('T')[0],
+      type: activityType.replace('HKWorkoutActivityType', ''),
+      duration: Math.round(duration || 0),
+      calories: Math.round(calories || 0),
+      distance: distance ? +(distance / 1000).toFixed(2) : 0,
+      start: startDate.toISOString(),
+      end: endStr,
+    });
+  });
+
+  return data;
+}
+
+function saveAppleHealthData(healthData) {
+  // Aggregate sleep by date
+  const sleepByDate = {};
+  healthData.sleep.forEach(s => {
+    if (!sleepByDate[s.date]) {
+      sleepByDate[s.date] = { total: 0, deep: 0, rem: 0, core: 0, awake: 0 };
+    }
+    const d = sleepByDate[s.date];
+    d.total += s.durationMin;
+    if (s.stage === 'AsleepDeep' || s.stage === 'Deep') d.deep += s.durationMin;
+    else if (s.stage === 'AsleepREM' || s.stage === 'REM') d.rem += s.durationMin;
+    else if (s.stage === 'AsleepCore' || s.stage === 'Core' || s.stage === 'Asleep') d.core += s.durationMin;
+    else if (s.stage === 'Awake') d.awake += s.durationMin;
+  });
+
+  // Aggregate steps by date
+  const stepsByDate = {};
+  healthData.steps.forEach(s => {
+    stepsByDate[s.date] = (stepsByDate[s.date] || 0) + s.value;
+  });
+
+  // Aggregate calories by date
+  const calByDate = {};
+  healthData.activeCalories.forEach(c => {
+    calByDate[c.date] = (calByDate[c.date] || 0) + c.value;
+  });
+
+  // Get latest HRV by date
+  const hrvByDate = {};
+  healthData.hrv.forEach(h => {
+    if (!hrvByDate[h.date] || h.value > 0) hrvByDate[h.date] = h.value;
+  });
+
+  // Get latest RHR by date
+  const rhrByDate = {};
+  healthData.restingHR.forEach(r => {
+    rhrByDate[r.date] = r.value;
+  });
+
+  // Build daily summaries (last 30 days)
+  const summaries = {};
+  const today = new Date();
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateKey = d.toISOString().split('T')[0];
+
+    const sleep = sleepByDate[dateKey];
+    const sleepHours = sleep ? +(sleep.total / 60).toFixed(1) : null;
+    const deepPct = sleep && sleep.total > 0 ? Math.round((sleep.deep / sleep.total) * 100) : null;
+    const remPct = sleep && sleep.total > 0 ? Math.round((sleep.rem / sleep.total) * 100) : null;
+
+    summaries[dateKey] = {
+      sleep: sleepHours,
+      deepPct,
+      remPct,
+      lightPct: (deepPct !== null && remPct !== null) ? Math.max(0, 100 - deepPct - remPct) : null,
+      hrv: hrvByDate[dateKey] || null,
+      restingHR: rhrByDate[dateKey] || null,
+      steps: stepsByDate[dateKey] || null,
+      activeCalories: calByDate[dateKey] || null,
+    };
+  }
+
+  // Store aggregated data
+  const appleHealthStore = {
+    summaries,
+    workouts: healthData.workouts.slice(-50), // last 50 workouts
+    latestVO2Max: healthData.vo2Max.length > 0 ? healthData.vo2Max[healthData.vo2Max.length - 1].value : null,
+    latestBodyMass: healthData.bodyMass.length > 0 ? healthData.bodyMass[healthData.bodyMass.length - 1] : null,
+    importedAt: new Date().toISOString(),
+  };
+
+  localStorage.setItem('hyrox_apple_health', JSON.stringify(appleHealthStore));
+
+  // Also store as wearable sleep data for recovery matrix
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yKey = yesterday.toISOString().split('T')[0];
+  const todayKey = new Date().toISOString().split('T')[0];
+
+  const latestSleep = summaries[yKey] || summaries[todayKey];
+  if (latestSleep && latestSleep.sleep) {
+    const recoveryScore = calculateAppleHealthRecovery(latestSleep);
+    const sleepCacheData = {
+      hasData: true,
+      device: 'apple_health',
+      deviceLabel: 'Apple Health Sleep',
+      timestamp: Date.now(),
+      recoveryScore,
+      sleep: {
+        hours: latestSleep.sleep,
+        deepPct: latestSleep.deepPct || 20,
+        remPct: latestSleep.remPct || 22,
+        lightPct: latestSleep.lightPct || 58,
+        quality: recoveryScore > 80 ? 'Good' : recoveryScore > 60 ? 'Fair' : 'Poor',
+      },
+      hrv: latestSleep.hrv || 45,
+      restingHR: latestSleep.restingHR || 58,
+    };
+    localStorage.setItem('hyrox_sleep_apple_health', JSON.stringify(sleepCacheData));
+  }
+}
+
+function calculateAppleHealthRecovery(daySummary) {
+  let score = 50; // base
+
+  // Sleep hours (optimal 7-9h)
+  if (daySummary.sleep) {
+    if (daySummary.sleep >= 7 && daySummary.sleep <= 9) score += 25;
+    else if (daySummary.sleep >= 6) score += 15;
+    else if (daySummary.sleep >= 5) score += 5;
+    else score -= 10;
+  }
+
+  // Deep sleep (optimal > 20%)
+  if (daySummary.deepPct) {
+    if (daySummary.deepPct >= 20) score += 10;
+    else if (daySummary.deepPct >= 15) score += 5;
+  }
+
+  // HRV (higher is generally better)
+  if (daySummary.hrv) {
+    if (daySummary.hrv >= 60) score += 10;
+    else if (daySummary.hrv >= 40) score += 5;
+    else score -= 5;
+  }
+
+  // Resting HR (lower is better for athletes)
+  if (daySummary.restingHR) {
+    if (daySummary.restingHR <= 55) score += 5;
+    else if (daySummary.restingHR <= 65) score += 2;
+    else score -= 5;
+  }
+
+  return Math.max(10, Math.min(100, score));
+}
+
+function getAppleHealthSummary() {
+  try {
+    const raw = localStorage.getItem('hyrox_apple_health');
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) { return null; }
+}
+
+function getAppleHealthWorkouts() {
+  const data = getAppleHealthSummary();
+  if (!data || !data.workouts) return [];
+
+  return data.workouts.map(w => ({
+    name: `${w.type} Workout`,
+    type: mapAppleWorkoutType(w.type),
+    date: new Date(w.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    duration: w.duration > 3600
+      ? `${Math.floor(w.duration / 3600)}h ${Math.floor((w.duration % 3600) / 60)}m`
+      : `${Math.floor(w.duration / 60)}m`,
+    distance: w.distance > 0 ? `${w.distance} km` : '',
+    calories: w.calories || null,
+    hr_avg: null, // Apple Health export doesn't include avg HR per workout easily
+  }));
+}
+
+function mapAppleWorkoutType(appleType) {
+  const map = {
+    Running: 'running',
+    Cycling: 'cycling',
+    FunctionalStrengthTraining: 'strength',
+    TraditionalStrengthTraining: 'strength',
+    Rowing: 'rowing',
+    HighIntensityIntervalTraining: 'hyrox',
+    CrossTraining: 'hyrox',
+    Walking: 'other',
+    Swimming: 'other',
+    Yoga: 'other',
+  };
+  return map[appleType] || 'other';
 }
 
 // ---- Strava Real OAuth2 Flow ----
@@ -575,6 +1104,15 @@ async function syncWearableActivities(deviceId) {
   if (conn?.isDemo) {
     await new Promise(r => setTimeout(r, 800));
     wearableActivities = generateDemoActivities();
+  } else if (deviceId === 'apple_health' && conn?.dataSource === 'xml_import') {
+    // Load from parsed Apple Health data
+    await new Promise(r => setTimeout(r, 400));
+    const ahWorkouts = getAppleHealthWorkouts();
+    if (ahWorkouts.length > 0) {
+      wearableActivities = ahWorkouts;
+    } else {
+      wearableActivities = generateDemoActivities();
+    }
   } else if (deviceId === 'strava' && conn?.accessToken) {
     // Real Strava sync
     const activities = await syncStravaActivities();
@@ -671,7 +1209,7 @@ function importWearableHyrox(idx) {
   syncUIFromState();
   recalculate();
   closeGarminModal();
-  showTab('setup');
+  showTab('train');
 }
 
 function generateDemoActivities() {
