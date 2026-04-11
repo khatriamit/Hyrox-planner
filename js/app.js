@@ -49,7 +49,13 @@ function showTab(tab) {
   });
   window.scrollTo(0, 0);
   if (tab === 'analysis') renderAnalysis();
-  if (tab === 'train') renderWeeklyPlan();
+  if (tab === 'train') {
+    if (state.raceDate && typeof renderPeriodizedPlan === 'function') {
+      renderPeriodizedPlan();
+    } else {
+      renderWeeklyPlan();
+    }
+  }
 }
 
 // ============================================================
@@ -993,6 +999,20 @@ function syncUIFromState() {
 // Initialize
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
+  // Check if user is logged in
+  const user = getCurrentUser();
+  if (user) {
+    if (!isOnboarded()) {
+      // Logged in but hasn't completed onboarding
+      startOnboarding();
+    } else {
+      enterApp();
+      checkGarminCallback();
+    }
+  } else {
+    showLoginScreen();
+  }
+
   syncUIFromState();
   recalculate();
   renderChecklist();

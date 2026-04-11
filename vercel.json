@@ -4,7 +4,9 @@
   "rewrites": [
     { "source": "/api/search", "destination": "/api/search" },
     { "source": "/api/athlete", "destination": "/api/athlete" },
-    { "source": "/api/filters", "destination": "/api/filters" }
+    { "source": "/api/filters", "destination": "/api/filters" },
+    { "source": "/api/garmin/auth", "destination": "/api/garmin/auth" },
+    { "source": "/api/garmin/activities", "destination": "/api/garmin/activities" }
   ],
   "headers": [
     {

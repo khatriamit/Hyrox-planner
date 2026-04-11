@@ -46,6 +46,108 @@
 </head>
 <body class="bg-hyrox-dark text-white min-h-screen pb-20">
 
+  <!-- ==================== LOGIN SCREEN ==================== -->
+  <div id="login-screen" class="min-h-screen flex flex-col items-center justify-center px-4">
+
+    <!-- Logo -->
+    <div class="mb-8 text-center">
+      <div class="w-16 h-16 bg-hyrox-yellow rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-hyrox-yellow/20">
+        <span class="text-hyrox-dark font-extrabold text-2xl">H</span>
+      </div>
+      <h1 class="text-3xl font-extrabold tracking-tight">Hyrox Planner</h1>
+      <p class="text-gray-400 text-sm mt-2">Plan. Train. Race.</p>
+    </div>
+
+    <!-- Login Form -->
+    <div id="login-form" class="w-full max-w-sm">
+      <form onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1.5">Email</label>
+          <input type="email" id="login-email" required
+            class="w-full h-12 bg-hyrox-gray border border-hyrox-gray rounded-xl px-4 text-white placeholder-gray-500 focus:border-hyrox-yellow outline-none transition-colors"
+            placeholder="you@example.com" />
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1.5">Password</label>
+          <input type="password" id="login-password" required
+            class="w-full h-12 bg-hyrox-gray border border-hyrox-gray rounded-xl px-4 text-white placeholder-gray-500 focus:border-hyrox-yellow outline-none transition-colors"
+            placeholder="Enter password" />
+        </div>
+        <p id="login-error" class="auth-error text-red-400 text-xs min-h-[1rem]"></p>
+        <button type="submit"
+          class="w-full h-12 bg-hyrox-yellow text-hyrox-dark font-extrabold text-sm uppercase tracking-wider rounded-xl hover:bg-yellow-400 transition-colors">
+          Sign In
+        </button>
+      </form>
+      <p class="text-center text-gray-400 text-sm mt-6">
+        Don't have an account?
+        <button onclick="showSignupForm()" class="text-hyrox-yellow font-semibold hover:underline">Create one</button>
+      </p>
+    </div>
+
+    <!-- Signup Form -->
+    <div id="signup-form" class="w-full max-w-sm hidden">
+      <form onsubmit="handleSignup(event)" class="space-y-4">
+        <div>
+          <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1.5">Name</label>
+          <input type="text" id="signup-name" required
+            class="w-full h-12 bg-hyrox-gray border border-hyrox-gray rounded-xl px-4 text-white placeholder-gray-500 focus:border-hyrox-yellow outline-none transition-colors"
+            placeholder="Your name" />
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1.5">Email</label>
+          <input type="email" id="signup-email" required
+            class="w-full h-12 bg-hyrox-gray border border-hyrox-gray rounded-xl px-4 text-white placeholder-gray-500 focus:border-hyrox-yellow outline-none transition-colors"
+            placeholder="you@example.com" />
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1.5">Password</label>
+          <input type="password" id="signup-password" required minlength="4"
+            class="w-full h-12 bg-hyrox-gray border border-hyrox-gray rounded-xl px-4 text-white placeholder-gray-500 focus:border-hyrox-yellow outline-none transition-colors"
+            placeholder="Create a password (4+ chars)" />
+        </div>
+        <p id="signup-error" class="auth-error text-red-400 text-xs min-h-[1rem]"></p>
+        <button type="submit"
+          class="w-full h-12 bg-hyrox-yellow text-hyrox-dark font-extrabold text-sm uppercase tracking-wider rounded-xl hover:bg-yellow-400 transition-colors">
+          Create Account
+        </button>
+      </form>
+      <p class="text-center text-gray-400 text-sm mt-6">
+        Already have an account?
+        <button onclick="showLoginForm()" class="text-hyrox-yellow font-semibold hover:underline">Sign in</button>
+      </p>
+    </div>
+
+    <p class="text-gray-600 text-[10px] mt-8">Data stored locally in your browser</p>
+  </div>
+
+  <!-- ==================== ONBOARDING SCREEN ==================== -->
+  <div id="onboarding-screen" class="hidden min-h-screen flex flex-col">
+    <!-- Onboarding Header -->
+    <div class="sticky top-0 z-50 bg-hyrox-dark/95 backdrop-blur px-4 py-3">
+      <div class="max-w-lg mx-auto flex items-center justify-between">
+        <button onclick="prevOnboardingStep()" id="onboarding-back" class="text-gray-400 hover:text-white text-sm flex items-center gap-1 invisible">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          Back
+        </button>
+        <span id="onboarding-step-count" class="text-gray-500 text-xs font-mono">1 / 8</span>
+      </div>
+      <!-- Progress bar -->
+      <div class="max-w-lg mx-auto mt-2">
+        <div class="w-full bg-hyrox-gray rounded-full h-1">
+          <div id="onboarding-progress" class="bg-hyrox-yellow h-1 rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Onboarding Content -->
+    <div class="flex-1 flex items-start justify-center">
+      <div id="onboarding-content" class="max-w-lg w-full px-5 py-6"></div>
+    </div>
+  </div>
+
+  <!-- ==================== APP SHELL (hidden until logged in) ==================== -->
+  <div id="app-shell" class="hidden">
+
   <!-- Header -->
   <header class="sticky top-0 z-50 bg-hyrox-dark/95 backdrop-blur border-b border-hyrox-gray">
     <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
@@ -55,7 +157,36 @@
         </div>
         <h1 class="font-bold text-lg">Hyrox Planner</h1>
       </div>
-      <button onclick="resetAll()" class="text-xs text-gray-400 hover:text-white bg-hyrox-gray px-2.5 py-1 rounded-full">Reset</button>
+      <div class="flex items-center gap-2">
+        <button onclick="resetAll()" class="text-xs text-gray-400 hover:text-white bg-hyrox-gray px-2.5 py-1 rounded-full">Reset</button>
+        <div class="relative">
+          <button onclick="toggleProfileMenu()" id="profile-btn"
+            class="w-8 h-8 bg-hyrox-yellow rounded-full flex items-center justify-center hover:bg-yellow-400 transition-colors">
+            <span id="user-avatar" class="text-hyrox-dark font-bold text-sm">U</span>
+          </button>
+          <!-- Profile Dropdown -->
+          <div id="profile-menu" class="hidden absolute right-0 mt-2 w-56 bg-hyrox-gray border border-hyrox-gray rounded-xl shadow-xl overflow-hidden z-50">
+            <div class="px-4 py-3 border-b border-hyrox-dark/50">
+              <div id="user-name" class="font-semibold text-sm">User</div>
+              <div class="text-gray-400 text-xs">Hyrox Planner</div>
+            </div>
+            <button onclick="showWearableModal()"
+              class="w-full text-left px-4 py-3 hover:bg-hyrox-dark/50 transition-colors flex items-center gap-3 text-sm">
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+              </svg>
+              Wearables
+            </button>
+            <button onclick="logout()"
+              class="w-full text-left px-4 py-3 hover:bg-hyrox-dark/50 transition-colors flex items-center gap-3 text-sm text-red-400">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+              </svg>
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -494,8 +625,37 @@
 
   </main>
 
-  <script src="js/data.js?v=5"></script>
-  <script src="js/workouts.js?v=5"></script>
-  <script src="js/app.js?v=5"></script>
+  </div><!-- end #app-shell -->
+
+  <!-- ==================== GARMIN MODAL ==================== -->
+  <div id="garmin-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+    <div class="bg-hyrox-dark border border-hyrox-gray rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-hyrox-gray">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+            </svg>
+          </div>
+          <h3 class="font-bold text-lg">Wearables</h3>
+        </div>
+        <button onclick="closeGarminModal()" class="text-gray-400 hover:text-white p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <!-- Modal Content -->
+      <div id="garmin-content" class="p-5"></div>
+    </div>
+  </div>
+
+  <script src="js/data.js?v=8"></script>
+  <script src="js/workouts.js?v=8"></script>
+  <script src="js/auth.js?v=8"></script>
+  <script src="js/training-plan.js?v=8"></script>
+  <script src="js/onboarding.js?v=8"></script>
+  <script src="js/app.js?v=8"></script>
 </body>
 </html>

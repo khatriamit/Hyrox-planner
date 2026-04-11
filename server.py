@@ -290,6 +290,12 @@ class HyroxHandler(SimpleHTTPRequestHandler):
             self._handle_search(query)
         elif parsed.path == "/api/athlete":
             self._handle_athlete(query)
+        elif parsed.path == "/api/garmin/auth":
+            self._handle_garmin_auth()
+        elif parsed.path == "/api/garmin/callback":
+            self._handle_garmin_callback(query)
+        elif parsed.path == "/api/garmin/activities":
+            self._handle_garmin_activities(query)
         else:
             super().do_GET()
 
@@ -331,6 +337,31 @@ class HyroxHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             print(f"[ERROR] Detail: {e}")
             self._json({"error": str(e)}, 500)
+
+    def _handle_garmin_auth(self):
+        """Initiate Garmin OAuth flow (requires GARMIN_KEY and GARMIN_SECRET env vars)."""
+        garmin_key = os.environ.get("GARMIN_KEY", "")
+        garmin_secret = os.environ.get("GARMIN_SECRET", "")
+        if not garmin_key or not garmin_secret:
+            self._json({
+                "error": "Garmin API credentials not configured",
+                "hint": "Set GARMIN_KEY and GARMIN_SECRET environment variables"
+            }, 501)
+            return
+        # In production, this would do OAuth 1.0a request token flow
+        # For now, return instructions
+        self._json({
+            "error": "Garmin OAuth requires server-side implementation with your API keys",
+            "hint": "Configure GARMIN_KEY and GARMIN_SECRET, then implement OAuth 1.0a flow"
+        }, 501)
+
+    def _handle_garmin_callback(self, query):
+        """Handle Garmin OAuth callback."""
+        self._json({"error": "Not implemented — use demo mode for testing"}, 501)
+
+    def _handle_garmin_activities(self, query):
+        """Fetch activities from Garmin Connect (requires auth)."""
+        self._json({"error": "Not implemented — use demo mode for testing"}, 501)
 
     def _json(self, data, status=200):
         body = json.dumps(data).encode("utf-8")
