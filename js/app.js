@@ -460,18 +460,42 @@ async function searchAthlete() {
   btn.disabled = true;
   btn.textContent = 'Searching...';
 
+  // Detect future races (no results exist yet) and short-circuit with a clear message
+  const cityVal = document.getElementById('filter-city')?.value || '';
+  const selectedCity = (filtersData?.cities || FALLBACK_FILTERS.cities || []).find(c => c.city === cityVal);
+  const isFutureRace = cityVal && cityVal.startsWith('2026 ') && (!selectedCity?.events || selectedCity.events.length === 0);
+  if (isFutureRace) {
+    statusEl.classList.add('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Search';
+    resultsEl.innerHTML = `
+      <div class="border border-zinc-800 rounded-xl p-8 text-center">
+        <div class="text-zinc-300 text-sm mb-2">${cityVal.replace('2026 ', '')} hasn't happened yet</div>
+        <p class="text-zinc-500 text-xs">Results are only available after race day. Try "All events" to find your past races.</p>
+      </div>`;
+    return;
+  }
+
   try {
     const params = new URLSearchParams();
     if (firstName) params.set('first_name', firstName);
     if (lastName) params.set('last_name', lastName);
 
-    // Add filter params
-    const eventVal = document.getElementById('filter-division')?.value || '';
+    // NOTE: we intentionally do NOT forward `filter-division` as the `event`
+    // param — Hyrox expects an event *code* (e.g. H8I_xxx) and sending a
+    // division label like "HYROX Doubles Men" causes the backend scrape to
+    // fail. Division/sex/AG are applied as client-side filters below.
     const sexVal = document.getElementById('filter-sex')?.value || '';
     const ageVal = document.getElementById('filter-age')?.value || '';
-    if (eventVal) params.set('event', eventVal);
     if (sexVal) params.set('sex', sexVal);
     if (ageVal) params.set('age_class', ageVal);
+
+    // Only forward city as `event` if we have a real event code for it
+    if (selectedCity && selectedCity.events && selectedCity.events.length > 0) {
+      const first = selectedCity.events[0];
+      const eventCode = typeof first === 'string' ? first : (first.id || first.code || '');
+      if (eventCode) params.set('event', eventCode);
+    }
 
     const resp = await fetch(`/api/search?${params}`);
     const data = await resp.json();
@@ -555,8 +579,8 @@ async function searchAthlete() {
     btn.textContent = 'Search';
     resultsEl.innerHTML = `
       <div class="border border-zinc-800 rounded-xl p-8 text-center">
-        <div class="text-red-400 text-sm mb-2">Could not connect to results server</div>
-        <p class="text-zinc-500 text-xs">Make sure the server is running</p>
+        <div class="text-red-400 text-sm mb-2">Couldn't reach Hyrox results</div>
+        <p class="text-zinc-500 text-xs">The Hyrox timing site may be slow right now. Try again in a moment, or search <a href="https://results.hyrox.com/season-8/" target="_blank" class="text-hyrox-green hover:underline">results.hyrox.com</a> directly.</p>
       </div>`;
   }
 }
