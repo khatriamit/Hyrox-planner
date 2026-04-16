@@ -1,4 +1,6 @@
 {
+  "buildCommand": "",
+  "outputDirectory": ".",
   "functions": {
     "api/**/*.py": {
       "runtime": "@vercel/python@4.3.1"
