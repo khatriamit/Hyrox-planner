@@ -49,7 +49,10 @@ function showTab(tab) {
   });
   window.scrollTo(0, 0);
   if (tab === 'analysis') renderAnalysis();
-  if (tab === 'import') renderImportLanding();
+  if (tab === 'import') {
+    renderImportLanding();
+    loadFilters(); // ensure dropdowns are populated
+  }
   if (tab === 'train') {
     if (state.raceDate && typeof renderPeriodizedPlan === 'function') {
       renderPeriodizedPlan();
@@ -855,70 +858,162 @@ function toggleFilters() {
   if (!filtersData) loadFilters();
 }
 
+// Fallback filter data when API is unavailable — keeps dropdowns functional
+const FALLBACK_FILTERS = {
+  cities: [
+    { city: 'London 2025', events: [] },
+    { city: 'Bengaluru 2026', events: [] },
+    { city: 'Mumbai 2025', events: [] },
+    { city: 'Singapore 2025', events: [] },
+    { city: 'Cologne 2026', events: [] },
+    { city: 'Rotterdam 2026', events: [] },
+    { city: 'Warsaw 2026', events: [] },
+    { city: 'Malaga 2026', events: [] },
+    { city: 'Monterrey 2026', events: [] },
+    { city: 'Brisbane 2026', events: [] },
+    { city: 'Wuhan 2026', events: [] },
+    { city: 'Bologna 2026', events: [] },
+  ],
+  genders: [
+    { value: 'M', label: 'Men' },
+    { value: 'W', label: 'Women' },
+  ],
+  age_groups: [
+    { value: '16-24', label: '16-24' },
+    { value: '25-29', label: '25-29' },
+    { value: '30-34', label: '30-34' },
+    { value: '35-39', label: '35-39' },
+    { value: '40-44', label: '40-44' },
+    { value: '45-49', label: '45-49' },
+    { value: '50-54', label: '50-54' },
+    { value: '55-59', label: '55-59' },
+    { value: '60-64', label: '60-64' },
+    { value: '65+', label: '65+' },
+  ],
+  nations: [
+    { value: 'IND', label: 'India 🇮🇳' },
+    { value: 'GBR', label: 'United Kingdom 🇬🇧' },
+    { value: 'USA', label: 'United States 🇺🇸' },
+    { value: 'GER', label: 'Germany 🇩🇪' },
+    { value: 'AUS', label: 'Australia 🇦🇺' },
+    { value: 'SGP', label: 'Singapore 🇸🇬' },
+    { value: 'NED', label: 'Netherlands 🇳🇱' },
+    { value: 'FRA', label: 'France 🇫🇷' },
+    { value: 'ESP', label: 'Spain 🇪🇸' },
+    { value: 'ITA', label: 'Italy 🇮🇹' },
+    { value: 'POL', label: 'Poland 🇵🇱' },
+    { value: 'CAN', label: 'Canada 🇨🇦' },
+    { value: 'HKG', label: 'Hong Kong 🇭🇰' },
+    { value: 'UAE', label: 'UAE 🇦🇪' },
+    { value: 'JPN', label: 'Japan 🇯🇵' },
+    { value: 'BRA', label: 'Brazil 🇧🇷' },
+  ],
+};
+
 async function loadFilters() {
   const statusEl = document.getElementById('filters-status');
-  statusEl.textContent = 'Loading filters from Hyrox...';
+  if (statusEl) statusEl.textContent = 'Loading filters...';
+
+  // Populate with fallback immediately so dropdowns are always usable
+  if (!filtersData) {
+    filtersData = FALLBACK_FILTERS;
+    populateFilterDropdowns();
+  }
+
+  // Try to fetch real data and replace if successful
   try {
     const resp = await fetch('/api/filters');
-    filtersData = await resp.json();
-    populateFilterDropdowns();
-    statusEl.textContent = `${filtersData.cities?.length || 0} race cities loaded`;
+    if (!resp.ok) throw new Error('API not ok');
+    const data = await resp.json();
+    if (data && (data.cities?.length || data.genders?.length)) {
+      // Merge: keep fallback nations (API may not return them)
+      filtersData = { ...FALLBACK_FILTERS, ...data };
+      populateFilterDropdowns();
+      if (statusEl) statusEl.textContent = `${filtersData.cities?.length || 0} race cities loaded`;
+    }
   } catch (err) {
-    statusEl.textContent = 'Could not load filters. Searching all races.';
+    if (statusEl) statusEl.textContent = '';
+    // fallback already populated — dropdowns stay functional
   }
 }
 
 function populateFilterDropdowns() {
   if (!filtersData) return;
 
-  // Cities
+  // Cities (Races)
   const citySelect = document.getElementById('filter-city');
-  citySelect.innerHTML = '<option value="">All Time Ranking (all races)</option>';
-  (filtersData.cities || []).forEach((c, i) => {
-    const opt = document.createElement('option');
-    opt.value = i; // store index for lookup
-    opt.textContent = c.city;
-    citySelect.appendChild(opt);
-  });
+  if (citySelect) {
+    const currentVal = citySelect.value;
+    citySelect.innerHTML = '<option value="">All events</option>';
+    (filtersData.cities || []).forEach((c, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = c.city;
+      citySelect.appendChild(opt);
+    });
+    if (currentVal) citySelect.value = currentVal;
+  }
 
   // Genders
   const sexSelect = document.getElementById('filter-sex');
-  sexSelect.innerHTML = '<option value="">Any</option>';
-  (filtersData.genders || []).forEach(g => {
-    const opt = document.createElement('option');
-    opt.value = g.value;
-    opt.textContent = g.label;
-    sexSelect.appendChild(opt);
-  });
+  if (sexSelect) {
+    const currentVal = sexSelect.value;
+    sexSelect.innerHTML = '<option value="">All genders</option>';
+    (filtersData.genders || []).forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g.value;
+      opt.textContent = g.label;
+      sexSelect.appendChild(opt);
+    });
+    if (currentVal) sexSelect.value = currentVal;
+  }
 
   // Age groups
   const ageSelect = document.getElementById('filter-age');
-  ageSelect.innerHTML = '<option value="">Any</option>';
-  (filtersData.age_groups || []).forEach(a => {
-    const opt = document.createElement('option');
-    opt.value = a.value;
-    opt.textContent = a.label;
-    ageSelect.appendChild(opt);
-  });
+  if (ageSelect) {
+    const currentVal = ageSelect.value;
+    ageSelect.innerHTML = '<option value="">All AGs</option>';
+    (filtersData.age_groups || []).forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.value;
+      opt.textContent = a.label;
+      ageSelect.appendChild(opt);
+    });
+    if (currentVal) ageSelect.value = currentVal;
+  }
+
+  // Nationalities
+  const natSelect = document.getElementById('filter-nationality');
+  if (natSelect) {
+    const currentVal = natSelect.value;
+    natSelect.innerHTML = '<option value="">All nations</option>';
+    (filtersData.nations || FALLBACK_FILTERS.nations).forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n.value;
+      opt.textContent = n.label;
+      natSelect.appendChild(opt);
+    });
+    if (currentVal) natSelect.value = currentVal;
+  }
 }
 
 function onCityChange() {
   const citySelect = document.getElementById('filter-city');
-  const divWrap = document.getElementById('division-wrap');
   const divSelect = document.getElementById('filter-division');
+  if (!divSelect) return;
 
   const idx = citySelect.value;
   if (!idx || !filtersData) {
-    divWrap.classList.add('hidden');
-    divSelect.innerHTML = '<option value="">All Divisions</option>';
+    divSelect.classList.add('hidden');
+    divSelect.innerHTML = '<option value="">All divisions</option>';
     return;
   }
 
   const city = filtersData.cities[parseInt(idx)];
   if (!city || !city.events) return;
 
-  divWrap.classList.remove('hidden');
-  divSelect.innerHTML = '<option value="">All Divisions</option>';
+  divSelect.classList.remove('hidden');
+  divSelect.innerHTML = '<option value="">All divisions</option>';
   city.events.forEach(e => {
     const opt = document.createElement('option');
     opt.value = e.value;
