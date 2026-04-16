@@ -859,24 +859,119 @@ function toggleFilters() {
 }
 
 // Fallback filter data when API is unavailable — keeps dropdowns functional
+// Full Season 8 race calendar (results.hyrox.com)
 const FALLBACK_FILTERS = {
   cities: [
-    { city: 'London 2025', events: [] },
-    { city: 'Bengaluru 2026', events: [] },
-    { city: 'Mumbai 2025', events: [] },
-    { city: 'Singapore 2025', events: [] },
-    { city: 'Cologne 2026', events: [] },
-    { city: 'Rotterdam 2026', events: [] },
-    { city: 'Warsaw 2026', events: [] },
-    { city: 'Malaga 2026', events: [] },
-    { city: 'Monterrey 2026', events: [] },
-    { city: 'Brisbane 2026', events: [] },
-    { city: 'Wuhan 2026', events: [] },
-    { city: 'Bologna 2026', events: [] },
+    // 2026 upcoming/recent
+    { city: '2026 Warsaw', events: [] },
+    { city: '2026 Cologne', events: [] },
+    { city: '2026 Malaga', events: [] },
+    { city: '2026 Rotterdam', events: [] },
+    { city: '2026 Monterrey', events: [] },
+    { city: '2026 Brisbane (APAC Championship)', events: [] },
+    { city: '2026 Brisbane', events: [] },
+    { city: '2026 Bengaluru', events: [] },
+    { city: '2026 Wuhan', events: [] },
+    { city: '2026 Miami', events: [] },
+    { city: '2026 Cape Town', events: [] },
+    { city: '2026 Bologna', events: [] },
+    { city: '2026 Singapore', events: [] },
+    { city: '2026 London Olympia', events: [] },
+    { city: '2026 London Olympia (Youngstars)', events: [] },
+    { city: '2026 Houston', events: [] },
+    { city: '2026 Mechelen', events: [] },
+    { city: '2026 Bangkok', events: [] },
+    { city: '2026 Beijing', events: [] },
+    { city: '2026 Toulouse', events: [] },
+    { city: '2026 Glasgow', events: [] },
+    { city: '2026 Cancun', events: [] },
+    { city: '2026 Copenhagen', events: [] },
+    { city: '2026 Washington DC', events: [] },
+    { city: '2026 Taipei', events: [] },
+    { city: '2026 Fortaleza', events: [] },
+    { city: '2026 Las Vegas', events: [] },
+    { city: '2026 Katowice', events: [] },
+    { city: '2026 Istanbul', events: [] },
+    { city: '2026 Nice', events: [] },
+    { city: '2026 Bilbao', events: [] },
+    { city: '2026 Guadalajara', events: [] },
+    { city: '2026 Vienna', events: [] },
+    { city: '2026 Phoenix', events: [] },
+    { city: '2026 Auckland', events: [] },
+    { city: '2026 Osaka', events: [] },
+    { city: '2026 Turin', events: [] },
+    { city: '2026 Amsterdam', events: [] },
+    { city: '2026 Amsterdam (Youngstars)', events: [] },
+    { city: '2026 Manchester', events: [] },
+    { city: '2026 St. Gallen', events: [] },
+    // 2025
+    { city: '2025 Stockholm', events: [] },
+    { city: '2025 Shenzhen', events: [] },
+    { city: '2025 Vancouver', events: [] },
+    { city: '2025 Anaheim', events: [] },
+    { city: '2025 Frankfurt', events: [] },
+    { city: '2025 Melbourne', events: [] },
+    { city: '2025 Gent', events: [] },
+    { city: '2025 Poznan', events: [] },
+    { city: '2025 London Excel', events: [] },
+    { city: '2025 Verona', events: [] },
+    { city: '2025 Johannesburg', events: [] },
+    { city: '2025 Utrecht', events: [] },
+    { city: '2025 Madrid', events: [] },
+    { city: '2025 Rio de Janeiro', events: [] },
+    { city: '2025 Singapore Expo', events: [] },
+    { city: '2025 Bordeaux', events: [] },
+    { city: '2025 Dallas', events: [] },
+    { city: '2025 Shanghai', events: [] },
+    { city: '2025 Chicago', events: [] },
+    { city: '2025 Dublin', events: [] },
+    { city: '2025 Mexico City', events: [] },
+    { city: '2025 Seoul', events: [] },
+    { city: '2025 Atlanta', events: [] },
+    { city: '2025 Stuttgart', events: [] },
+    { city: '2025 Paris', events: [] },
+    { city: '2025 Birmingham', events: [] },
+    { city: '2025 Valencia', events: [] },
+    { city: '2025 Geneva', events: [] },
+    { city: '2025 Gdansk', events: [] },
+    { city: '2025 Hamburg', events: [] },
+    { city: '2025 Toronto', events: [] },
+    { city: '2025 Boston', events: [] },
+    { city: '2025 Oslo', events: [] },
+    { city: '2025 Rome', events: [] },
+    { city: '2025 Maastricht', events: [] },
+    { city: '2025 Sao Paulo', events: [] },
+    { city: '2025 Acapulco', events: [] },
+    { city: '2025 Mumbai', events: [] },
+    { city: '2025 Perth', events: [] },
+    { city: '2025 Beijing', events: [] },
+    { city: '2025 Yokohama', events: [] },
+    { city: '2025 Hong Kong', events: [] },
+    { city: '2025 Abu Dhabi', events: [] },
+    { city: '2025 Cape Town', events: [] },
+    { city: '2025 Delhi', events: [] },
+    { city: '2025 Sydney', events: [] },
+    { city: '2025 Singapore', events: [] },
   ],
   genders: [
     { value: 'M', label: 'Men' },
     { value: 'W', label: 'Women' },
+  ],
+  divisions: [
+    { value: 'H_M', label: 'HYROX Men' },
+    { value: 'H_W', label: 'HYROX Women' },
+    { value: 'HPRO_M', label: 'HYROX Pro Men' },
+    { value: 'HPRO_W', label: 'HYROX Pro Women' },
+    { value: 'HD_M', label: 'HYROX Doubles Men' },
+    { value: 'HD_W', label: 'HYROX Doubles Women' },
+    { value: 'HD_X', label: 'HYROX Doubles Mixed' },
+    { value: 'HPRO_D_M', label: 'HYROX Pro Doubles Men' },
+    { value: 'HPRO_D_W', label: 'HYROX Pro Doubles Women' },
+    { value: 'HR_M', label: 'HYROX Team Relay Men' },
+    { value: 'HR_W', label: 'HYROX Team Relay Women' },
+    { value: 'HR_X', label: 'HYROX Team Relay Mixed' },
+    { value: 'HA_M', label: 'HYROX Adaptive Men' },
+    { value: 'HA_W', label: 'HYROX Adaptive Women' },
   ],
   age_groups: [
     { value: '16-24', label: '16-24' },
@@ -995,6 +1090,21 @@ function populateFilterDropdowns() {
     });
     if (currentVal) natSelect.value = currentVal;
   }
+
+  // Divisions — show defaults immediately, refined when city is picked
+  const divSelect = document.getElementById('filter-division');
+  if (divSelect && !divSelect.dataset.cityPicked) {
+    const currentVal = divSelect.value;
+    divSelect.innerHTML = '<option value="">All divisions</option>';
+    (filtersData.divisions || FALLBACK_FILTERS.divisions).forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.value;
+      opt.textContent = d.label;
+      divSelect.appendChild(opt);
+    });
+    if (currentVal) divSelect.value = currentVal;
+    divSelect.classList.remove('hidden'); // always show
+  }
 }
 
 function onCityChange() {
@@ -1003,18 +1113,31 @@ function onCityChange() {
   if (!divSelect) return;
 
   const idx = citySelect.value;
+
+  // No city picked — revert to default division list
   if (!idx || !filtersData) {
-    divSelect.classList.add('hidden');
+    delete divSelect.dataset.cityPicked;
     divSelect.innerHTML = '<option value="">All divisions</option>';
+    (filtersData?.divisions || FALLBACK_FILTERS.divisions).forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.value;
+      opt.textContent = d.label;
+      divSelect.appendChild(opt);
+    });
+    divSelect.classList.remove('hidden');
     return;
   }
 
   const city = filtersData.cities[parseInt(idx)];
-  if (!city || !city.events) return;
+  if (!city) return;
 
+  // City picked — show its specific divisions if available, otherwise defaults
+  divSelect.dataset.cityPicked = '1';
   divSelect.classList.remove('hidden');
   divSelect.innerHTML = '<option value="">All divisions</option>';
-  city.events.forEach(e => {
+
+  const divSource = (city.events && city.events.length > 0) ? city.events : FALLBACK_FILTERS.divisions;
+  divSource.forEach(e => {
     const opt = document.createElement('option');
     opt.value = e.value;
     opt.textContent = e.label;
