@@ -10,7 +10,8 @@
       theme: {
         extend: {
           colors: {
-            hyrox: { yellow: '#F5E600', dark: '#1A1A1A', gray: '#2D2D2D', light: '#F5F5F5' }
+            hyrox: { yellow: '#F5E600', dark: '#1A1A1A', gray: '#2D2D2D', light: '#F5F5F5', green: '#C8FF00' },
+            zinc: { 950: '#09090b', 900: '#18181b', 800: '#27272a', 700: '#3f3f46', 600: '#52525b' }
           }
         }
       }
@@ -205,161 +206,145 @@
   <main class="max-w-lg mx-auto px-4 py-6">
 
     <!-- ==================== IMPORT PB TAB ==================== -->
-    <section id="section-import" class="hidden">
+    <section id="section-import" class="hidden bg-black -mx-4 px-4 sm:-mx-6 sm:px-6 -mt-4 pt-4 min-h-screen">
 
-      <!-- Hyrox-style heading bar -->
-      <div class="flex items-center gap-3 border-b-2 border-hyrox-yellow pb-3 mb-6">
-        <div class="w-8 h-8">
-          <svg viewBox="0 0 40 40" class="w-full h-full"><rect width="40" height="40" rx="4" fill="#C8FF00"/><text x="20" y="28" text-anchor="middle" font-size="18" font-weight="900" fill="#1A1A1A" font-family="sans-serif">H</text></svg>
+      <!-- Breadcrumb — hyresult.com style -->
+      <nav class="flex items-center gap-1.5 text-xs text-zinc-500 mb-4">
+        <button onclick="resetPBSearch()" class="hover:text-white transition-colors">Events</button>
+        <span class="text-zinc-700">/</span>
+        <span id="breadcrumb-event" class="hover:text-white transition-colors cursor-pointer">Rankings</span>
+        <span class="text-zinc-700" id="breadcrumb-sep" style="display:none">/</span>
+        <span id="breadcrumb-division" class="text-white font-medium" style="display:none"></span>
+      </nav>
+
+      <!-- Title + stats bar -->
+      <div class="mb-5">
+        <div class="flex items-baseline gap-3 flex-wrap mb-3">
+          <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight text-white">HYROX Rankings</h2>
+          <span id="rankings-count" class="text-zinc-500 text-lg font-mono"></span>
         </div>
-        <div>
-          <h2 class="text-2xl font-extrabold tracking-tight uppercase">HYROX Results</h2>
-          <p class="text-gray-500 text-[10px] uppercase tracking-widest">Season 8 · Official Race Data</p>
-        </div>
+        <p class="text-zinc-400 text-sm">Find your race, import your splits, build your plan.</p>
       </div>
 
-      <!-- Search Form — Matching Hyrox official layout -->
-      <div class="bg-[#1a1a1a] border border-[#333] rounded-none p-5 mb-5">
-        <div class="flex items-center gap-2 mb-4">
-          <div class="w-1 h-4 bg-hyrox-yellow"></div>
-          <h3 class="text-white text-sm font-bold uppercase tracking-wider">Result Lists</h3>
-        </div>
-
-        <!-- Race (City) -->
-        <div class="flex items-center gap-4 mb-3">
-          <label class="text-xs text-gray-400 w-28 text-right flex-shrink-0 uppercase tracking-wider">Race</label>
+      <!-- Filter bar — hyresult.com style (horizontal dropdowns) -->
+      <div class="flex flex-wrap gap-2 mb-5 pb-4 border-b border-zinc-800">
+        <!-- Race -->
+        <div class="relative">
           <select id="filter-city" onchange="onCityChange()"
-            class="flex-1 h-9 bg-[#111] border border-[#444] px-3 text-xs text-white focus:border-hyrox-yellow outline-none">
-            <option value="">All Time Ranking</option>
+            class="h-9 bg-zinc-900 border border-zinc-700 rounded-md pl-3 pr-8 text-xs text-white hover:border-zinc-600 focus:border-hyrox-green outline-none appearance-none cursor-pointer">
+            <option value="">All events ▾</option>
           </select>
         </div>
 
         <!-- Division -->
-        <div id="division-wrap" class="flex items-center gap-4 mb-3 hidden">
-          <label class="text-xs text-gray-400 w-28 text-right flex-shrink-0 uppercase tracking-wider">Division</label>
+        <div id="division-wrap" class="relative hidden">
           <select id="filter-division"
-            class="flex-1 h-9 bg-[#111] border border-[#444] px-3 text-xs text-white focus:border-hyrox-yellow outline-none">
-            <option value="">All Divisions</option>
+            class="h-9 bg-zinc-900 border border-zinc-700 rounded-md pl-3 pr-8 text-xs text-white hover:border-zinc-600 focus:border-hyrox-green outline-none appearance-none cursor-pointer">
+            <option value="">All divisions ▾</option>
           </select>
         </div>
 
-        <!-- Last name -->
-        <div class="flex items-center gap-4 mb-3">
-          <label class="text-xs text-gray-400 w-28 text-right flex-shrink-0 uppercase tracking-wider">Last name</label>
-          <input type="text" id="search-last" placeholder=""
-            class="flex-1 h-9 bg-[#111] border border-[#444] px-3 text-xs text-white placeholder-gray-600 focus:border-hyrox-yellow outline-none" />
-        </div>
-
-        <!-- First Name -->
-        <div class="flex items-center gap-4 mb-3">
-          <label class="text-xs text-gray-400 w-28 text-right flex-shrink-0 uppercase tracking-wider">First Name</label>
-          <input type="text" id="search-first" placeholder=""
-            class="flex-1 h-9 bg-[#111] border border-[#444] px-3 text-xs text-white placeholder-gray-600 focus:border-hyrox-yellow outline-none" />
-        </div>
-
         <!-- Gender -->
-        <div class="flex items-center gap-4 mb-3">
-          <label class="text-xs text-gray-400 w-28 text-right flex-shrink-0 uppercase tracking-wider">Gender</label>
+        <div class="relative">
           <select id="filter-sex"
-            class="flex-1 h-9 bg-[#111] border border-[#444] px-3 text-xs text-white focus:border-hyrox-yellow outline-none">
-            <option value="">Any</option>
+            class="h-9 bg-zinc-900 border border-zinc-700 rounded-md pl-3 pr-8 text-xs text-white hover:border-zinc-600 focus:border-hyrox-green outline-none appearance-none cursor-pointer">
+            <option value="">All genders ▾</option>
           </select>
         </div>
 
         <!-- Age Group -->
-        <div class="flex items-center gap-4 mb-3">
-          <label class="text-xs text-gray-400 w-28 text-right flex-shrink-0 uppercase tracking-wider">Age Group</label>
+        <div class="relative">
           <select id="filter-age"
-            class="flex-1 h-9 bg-[#111] border border-[#444] px-3 text-xs text-white focus:border-hyrox-yellow outline-none">
-            <option value="">Any</option>
+            class="h-9 bg-zinc-900 border border-zinc-700 rounded-md pl-3 pr-8 text-xs text-white hover:border-zinc-600 focus:border-hyrox-green outline-none appearance-none cursor-pointer">
+            <option value="">All AGs ▾</option>
           </select>
         </div>
 
         <!-- Nationality -->
-        <div class="flex items-center gap-4 mb-4">
-          <label class="text-xs text-gray-400 w-28 text-right flex-shrink-0 uppercase tracking-wider">Nationality</label>
+        <div class="relative">
           <select id="filter-nationality"
-            class="flex-1 h-9 bg-[#111] border border-[#444] px-3 text-xs text-white focus:border-hyrox-yellow outline-none">
-            <option value="">Any</option>
+            class="h-9 bg-zinc-900 border border-zinc-700 rounded-md pl-3 pr-8 text-xs text-white hover:border-zinc-600 focus:border-hyrox-green outline-none appearance-none cursor-pointer">
+            <option value="">All nations ▾</option>
           </select>
         </div>
-
-        <!-- Show Results button -->
-        <div class="flex items-center gap-4">
-          <div class="w-28 flex-shrink-0"></div>
-          <button onclick="searchAthlete()" id="search-btn"
-            class="flex-1 py-2.5 bg-hyrox-yellow text-hyrox-dark font-extrabold text-xs uppercase tracking-widest hover:bg-yellow-400 transition-colors">
-            Show Results
-          </button>
-        </div>
-
-        <p class="text-gray-600 text-[10px] mt-3 text-center" id="filters-status"></p>
       </div>
 
+      <!-- Name search row -->
+      <div class="flex gap-2 mb-4">
+        <input type="text" id="search-first" placeholder="First name"
+          class="flex-1 h-9 bg-zinc-900 border border-zinc-700 rounded-md px-3 text-xs text-white placeholder-zinc-500 focus:border-hyrox-green outline-none" />
+        <input type="text" id="search-last" placeholder="Last name"
+          class="flex-1 h-9 bg-zinc-900 border border-zinc-700 rounded-md px-3 text-xs text-white placeholder-zinc-500 focus:border-hyrox-green outline-none" />
+        <button onclick="searchAthlete()" id="search-btn"
+          class="h-9 px-5 bg-hyrox-green text-black font-semibold text-xs rounded-md hover:bg-[#d4ff00] transition-colors whitespace-nowrap">
+          Search
+        </button>
+      </div>
+      <p class="text-zinc-600 text-[10px] mb-4" id="filters-status"></p>
+
       <!-- Search Status -->
-      <div id="search-status" class="hidden text-center py-4">
-        <div class="inline-flex items-center gap-2 text-gray-400 text-sm">
+      <div id="search-status" class="hidden text-center py-8">
+        <div class="inline-flex items-center gap-2 text-zinc-400 text-sm">
           <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
-          <span>Searching Hyrox results...</span>
+          <span>Loading data ...</span>
         </div>
       </div>
 
-      <!-- Results Table — Hyrox official style -->
+      <!-- Results Table — hyresult.com style -->
       <div id="search-results" class="mb-4"></div>
 
-      <!-- Selected Athlete Splits — Hyrox Detail View -->
+      <!-- Selected Athlete Splits — hyresult.com detail view -->
       <div id="athlete-splits" class="hidden">
-        <!-- Back + Actions bar -->
-        <div class="flex justify-between items-center mb-4">
-          <button onclick="document.getElementById('athlete-splits').classList.add('hidden');document.getElementById('search-results').classList.remove('hidden')" class="text-gray-400 text-xs hover:text-hyrox-yellow flex items-center gap-1">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-            Back / New Search
-          </button>
-          <div class="flex gap-2">
-            <button onclick="window.print()" class="text-gray-500 text-[10px] hover:text-white px-2 py-1 border border-[#333] rounded">Print</button>
-          </div>
+
+        <!-- Back nav -->
+        <button onclick="document.getElementById('athlete-splits').classList.add('hidden');document.getElementById('search-results').classList.remove('hidden')" class="flex items-center gap-1.5 text-zinc-400 text-xs hover:text-white transition-colors mb-4">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          Back to rankings
+        </button>
+
+        <!-- Athlete hero card -->
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-4">
+          <div id="pb-participant-info"></div>
         </div>
 
-        <!-- Athlete Header Card -->
-        <div class="bg-[#1a1a1a] border-l-4 border-hyrox-yellow p-4 mb-4">
-          <div id="pb-participant-info" class="space-y-1 text-sm"></div>
+        <!-- Stats cards row -->
+        <div id="pb-stats-cards" class="grid grid-cols-3 gap-2 mb-4"></div>
+
+        <!-- Splits Table header -->
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-white text-sm font-semibold">Race splits</h3>
+          <span class="text-zinc-500 text-xs">8 runs + 8 stations</span>
         </div>
 
-        <!-- Workout Summary Table — Hyrox style with alternating rows -->
-        <div class="mb-4">
-          <div class="flex items-center gap-2 mb-3">
-            <div class="w-1 h-4 bg-hyrox-yellow"></div>
-            <h3 class="text-white text-sm font-bold uppercase tracking-wider">Workout Summary</h3>
-          </div>
-
-          <div class="border border-[#333] overflow-hidden">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="bg-[#222] text-[10px] text-gray-400 uppercase tracking-wider">
-                  <th class="text-left font-semibold py-2 px-3">Split</th>
-                  <th class="text-right font-semibold py-2 px-3 w-24">Time</th>
-                  <th class="text-right font-semibold py-2 px-3 w-16 hidden sm:table-cell">%</th>
-                </tr>
-              </thead>
-              <tbody id="pb-splits-list" class="divide-y divide-[#2a2a2a]"></tbody>
-            </table>
-          </div>
+        <!-- Splits Table — hyresult.com style -->
+        <div class="border border-zinc-800 rounded-xl overflow-hidden mb-5">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-zinc-900/50 text-[10px] text-zinc-500 uppercase tracking-wider border-b border-zinc-800">
+                <th class="text-left font-medium py-2.5 px-3 w-10">#</th>
+                <th class="text-left font-medium py-2.5 px-3">Split</th>
+                <th class="text-right font-medium py-2.5 px-3 w-24">Time</th>
+                <th class="text-right font-medium py-2.5 px-3 w-16 hidden sm:table-cell">%</th>
+              </tr>
+            </thead>
+            <tbody id="pb-splits-list" class="divide-y divide-zinc-800"></tbody>
+          </table>
         </div>
 
         <button onclick="importPB()" id="import-btn"
-          class="w-full py-3.5 bg-hyrox-yellow text-hyrox-dark font-extrabold text-sm uppercase tracking-widest hover:bg-yellow-400 transition-colors mb-3">
-          ⬇ Import as My PB &amp; Set Targets
+          class="w-full py-3 bg-hyrox-green text-black font-semibold text-sm rounded-md hover:bg-[#d4ff00] transition-colors mb-2">
+          Import splits &amp; build my training plan →
         </button>
-        <p class="text-gray-500 text-xs text-center">This will set your station times and PB baseline for your training plan.</p>
+        <p class="text-zinc-500 text-xs text-center">Sets your PB baseline, station targets, and generates a periodized plan.</p>
       </div>
 
       <!-- Manual Entry link -->
-      <div class="mt-6 text-center border-t border-[#333] pt-4">
-        <p class="text-gray-500 text-xs mb-2">Don't have a Hyrox result yet?</p>
-        <button onclick="showTab('setup')" class="text-hyrox-yellow text-sm font-semibold hover:underline">Skip to manual setup →</button>
+      <div class="mt-8 pt-6 border-t border-zinc-800 text-center">
+        <p class="text-zinc-500 text-xs mb-2">Don't have a Hyrox result yet?</p>
+        <button onclick="showTab('setup')" class="text-hyrox-green text-sm font-medium hover:underline">Enter manually →</button>
       </div>
     </section>
 
@@ -679,11 +664,11 @@
     </div>
   </div>
 
-  <script src="js/data.js?v=9"></script>
-  <script src="js/workouts.js?v=9"></script>
-  <script src="js/auth.js?v=9"></script>
-  <script src="js/training-plan.js?v=9"></script>
-  <script src="js/onboarding.js?v=9"></script>
-  <script src="js/app.js?v=9"></script>
+  <script src="js/data.js?v=10"></script>
+  <script src="js/workouts.js?v=10"></script>
+  <script src="js/auth.js?v=10"></script>
+  <script src="js/training-plan.js?v=10"></script>
+  <script src="js/onboarding.js?v=10"></script>
+  <script src="js/app.js?v=10"></script>
 </body>
 </html>
