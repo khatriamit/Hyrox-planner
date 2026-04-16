@@ -774,6 +774,215 @@ function importPB() {
   showTab('train');
 }
 
+// ============================================================
+// Unified search bar — hyresult.com style (athletes + events)
+// ============================================================
+let unifiedSearchTimer = null;
+let unifiedSearchLastQuery = '';
+
+function onUnifiedSearchInput(e) {
+  const q = e.target.value.trim();
+  const clearBtn = document.getElementById('unified-search-clear');
+  if (clearBtn) clearBtn.classList.toggle('hidden', q.length === 0);
+
+  clearTimeout(unifiedSearchTimer);
+
+  if (q.length < 2) {
+    document.getElementById('unified-search-dropdown')?.classList.add('hidden');
+    return;
+  }
+
+  // Show event matches immediately (client-side, fast)
+  renderUnifiedDropdown(q, []);
+
+  // Debounced athlete search
+  unifiedSearchTimer = setTimeout(() => {
+    unifiedSearchLastQuery = q;
+    fetchUnifiedAthletes(q);
+  }, 300);
+}
+
+function onUnifiedSearchFocus() {
+  const input = document.getElementById('unified-search');
+  if (input?.value.trim().length >= 2) {
+    renderUnifiedDropdown(input.value.trim(), []);
+  }
+}
+
+function clearUnifiedSearch() {
+  const input = document.getElementById('unified-search');
+  if (input) input.value = '';
+  document.getElementById('unified-search-clear')?.classList.add('hidden');
+  document.getElementById('unified-search-dropdown')?.classList.add('hidden');
+  input?.focus();
+}
+
+async function fetchUnifiedAthletes(q) {
+  try {
+    // Split query into first/last name heuristically
+    const parts = q.split(/\s+/);
+    const firstName = parts[0] || '';
+    const lastName = parts.slice(1).join(' ') || '';
+
+    const params = new URLSearchParams();
+    if (firstName) params.set('first_name', firstName);
+    if (lastName) params.set('last_name', lastName);
+
+    const resp = await fetch(`/api/search?${params}`);
+    if (!resp.ok) throw new Error('Search failed');
+    const data = await resp.json();
+
+    // Only render if query is still current (debounce guard)
+    if (q !== unifiedSearchLastQuery) return;
+
+    // Group athletes by unique name, count races
+    const athleteMap = {};
+    (data.athletes || []).forEach(a => {
+      const key = (a.name || '').toLowerCase().trim();
+      if (!key) return;
+      if (!athleteMap[key]) {
+        athleteMap[key] = {
+          name: a.name,
+          raceCount: 0,
+          firstResult: a,
+          results: [],
+        };
+      }
+      athleteMap[key].raceCount++;
+      athleteMap[key].results.push(a);
+    });
+
+    const athletes = Object.values(athleteMap).slice(0, 8);
+    renderUnifiedDropdown(q, athletes);
+  } catch (err) {
+    renderUnifiedDropdown(q, [], true);
+  }
+}
+
+function renderUnifiedDropdown(query, athletes, errored = false) {
+  const dropdown = document.getElementById('unified-search-dropdown');
+  if (!dropdown) return;
+
+  const q = query.toLowerCase();
+  const cities = (filtersData?.cities || FALLBACK_FILTERS.cities) || [];
+  const matchedEvents = cities.filter(c => c.city.toLowerCase().includes(q)).slice(0, 5);
+
+  if (athletes.length === 0 && matchedEvents.length === 0 && !errored) {
+    dropdown.innerHTML = `
+      <div class="p-3">
+        <div class="flex items-center gap-2 text-zinc-500 text-xs">
+          <svg class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          <span>Searching...</span>
+        </div>
+      </div>`;
+    dropdown.classList.remove('hidden');
+    return;
+  }
+
+  let html = '';
+
+  // Athletes section
+  if (athletes.length > 0) {
+    html += athletes.map((a, idx) => {
+      const flag = getCountryFlag(a.firstResult.nationality || a.firstResult.city);
+      const raceLabel = a.raceCount === 1 ? '1 race' : `${a.raceCount} races`;
+      return `
+        <button onclick='openAthleteFromSearch(${JSON.stringify(a.firstResult).replace(/'/g, "&#39;")})'
+          class="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/70 transition-colors text-left ${idx > 0 ? 'border-t border-zinc-800' : ''}">
+          <svg class="w-5 h-5 text-zinc-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+          </svg>
+          <span class="text-base leading-none">${flag}</span>
+          <span class="text-white font-medium text-sm flex-1 truncate">${a.name}</span>
+          <span class="text-zinc-500 text-xs flex-shrink-0">${raceLabel}</span>
+        </button>`;
+    }).join('');
+  }
+
+  // Events section
+  if (matchedEvents.length > 0) {
+    if (athletes.length > 0) {
+      html += `<div class="border-t border-zinc-800 px-4 py-2 text-[10px] text-zinc-500 uppercase tracking-wider bg-zinc-900/50">Events</div>`;
+    }
+    html += matchedEvents.map((e, idx) => {
+      const flag = getCountryFlag(e.city);
+      return `
+        <button onclick="selectEventFromSearch('${e.city.replace(/'/g, "\\'")}')"
+          class="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/70 transition-colors text-left ${(athletes.length > 0 || idx > 0) ? 'border-t border-zinc-800' : ''}">
+          <svg class="w-5 h-5 text-zinc-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          <span class="text-base leading-none">${flag}</span>
+          <span class="text-white font-medium text-sm flex-1 truncate">HYROX ${e.city}</span>
+          <svg class="w-3 h-3 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </button>`;
+    }).join('');
+  }
+
+  if (!html) {
+    html = `<div class="px-4 py-6 text-center">
+      <div class="text-zinc-400 text-sm mb-1">No results for "${query}"</div>
+      <div class="text-zinc-600 text-[10px]">Try a different name or event</div>
+    </div>`;
+  }
+
+  dropdown.innerHTML = html;
+  dropdown.classList.remove('hidden');
+}
+
+function openAthleteFromSearch(athlete) {
+  document.getElementById('unified-search-dropdown')?.classList.add('hidden');
+  selectAthlete(athlete);
+}
+
+function selectEventFromSearch(cityName) {
+  document.getElementById('unified-search-dropdown')?.classList.add('hidden');
+  const citySelect = document.getElementById('filter-city');
+  if (!citySelect) return;
+
+  // Find matching option and select it
+  for (let i = 0; i < citySelect.options.length; i++) {
+    if (citySelect.options[i].textContent === cityName) {
+      citySelect.value = citySelect.options[i].value;
+      onCityChange();
+      break;
+    }
+  }
+
+  // Clear unified search and trigger rankings view
+  const input = document.getElementById('unified-search');
+  if (input) input.value = '';
+  document.getElementById('unified-search-clear')?.classList.add('hidden');
+
+  // Scroll down to show the filter/results area
+  document.getElementById('search-results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', (e) => {
+  const dropdown = document.getElementById('unified-search-dropdown');
+  const input = document.getElementById('unified-search');
+  if (!dropdown || !input) return;
+  if (!dropdown.contains(e.target) && e.target !== input && !input.contains(e.target)) {
+    dropdown.classList.add('hidden');
+  }
+});
+
+// Enter key on unified search = take first athlete match
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && document.activeElement?.id === 'unified-search') {
+    const firstBtn = document.querySelector('#unified-search-dropdown button');
+    if (firstBtn) { e.preventDefault(); firstBtn.click(); }
+  }
+  if (e.key === 'Escape' && document.activeElement?.id === 'unified-search') {
+    document.getElementById('unified-search-dropdown')?.classList.add('hidden');
+  }
+});
+
 // Reset PB search state (back from detail to list)
 function resetPBSearch() {
   document.getElementById('athlete-splits')?.classList.add('hidden');

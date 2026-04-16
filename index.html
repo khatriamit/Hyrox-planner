@@ -229,16 +229,35 @@
       </nav>
 
       <!-- Title + stats bar -->
-      <div class="mb-5">
-        <div class="flex items-baseline gap-3 flex-wrap mb-3">
+      <div class="mb-4">
+        <div class="flex items-baseline gap-3 flex-wrap mb-2">
           <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight text-white">HYROX Rankings</h2>
           <span id="rankings-count" class="text-zinc-500 text-lg font-mono"></span>
         </div>
         <p class="text-zinc-400 text-sm">Find your race, import your splits, build your plan.</p>
       </div>
 
-      <!-- Filter bar — hyresult.com style (horizontal dropdowns) -->
-      <div class="flex flex-wrap gap-2 mb-5 pb-4 border-b border-zinc-800">
+      <!-- Unified search bar — hyresult.com style -->
+      <div class="relative mb-3">
+        <div class="relative">
+          <svg class="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/>
+          </svg>
+          <input type="text" id="unified-search" autocomplete="off" placeholder="Athlete or event name"
+            oninput="onUnifiedSearchInput(event)"
+            onfocus="onUnifiedSearchFocus()"
+            class="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 text-sm text-white placeholder-zinc-500 focus:border-zinc-600 outline-none transition-colors" />
+          <button id="unified-search-clear" onclick="clearUnifiedSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-white">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Autocomplete dropdown -->
+        <div id="unified-search-dropdown" class="hidden absolute left-0 right-0 top-full mt-1 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-40 max-h-96 overflow-y-auto"></div>
+      </div>
+
+      <!-- Filter bar — secondary filters -->
+      <div class="flex flex-wrap gap-2 mb-4 pb-3 border-b border-zinc-800">
         <!-- Race -->
         <select id="filter-city" onchange="onCityChange()"
           class="hyresult-select h-9 bg-zinc-900 border border-zinc-700 rounded-md pl-3 pr-8 text-xs text-white hover:border-zinc-600 focus:border-hyrox-green outline-none appearance-none cursor-pointer">
@@ -270,17 +289,20 @@
         </select>
       </div>
 
-      <!-- Name search row -->
-      <div class="flex gap-2 mb-4">
-        <input type="text" id="search-first" placeholder="First name"
-          class="flex-1 h-9 bg-zinc-900 border border-zinc-700 rounded-md px-3 text-xs text-white placeholder-zinc-500 focus:border-hyrox-green outline-none" />
-        <input type="text" id="search-last" placeholder="Last name"
-          class="flex-1 h-9 bg-zinc-900 border border-zinc-700 rounded-md px-3 text-xs text-white placeholder-zinc-500 focus:border-hyrox-green outline-none" />
-        <button onclick="searchAthlete()" id="search-btn"
-          class="h-9 px-5 bg-hyrox-green text-black font-semibold text-xs rounded-md hover:bg-[#d4ff00] transition-colors whitespace-nowrap">
-          Search
-        </button>
-      </div>
+      <!-- Advanced: split name fields (collapsed by default) -->
+      <details class="mb-4">
+        <summary class="text-zinc-500 text-xs cursor-pointer hover:text-white transition-colors select-none">Advanced search (first / last name) ▾</summary>
+        <div class="flex gap-2 mt-2">
+          <input type="text" id="search-first" placeholder="First name"
+            class="flex-1 h-9 bg-zinc-900 border border-zinc-700 rounded-md px-3 text-xs text-white placeholder-zinc-500 focus:border-hyrox-green outline-none" />
+          <input type="text" id="search-last" placeholder="Last name"
+            class="flex-1 h-9 bg-zinc-900 border border-zinc-700 rounded-md px-3 text-xs text-white placeholder-zinc-500 focus:border-hyrox-green outline-none" />
+          <button onclick="searchAthlete()" id="search-btn"
+            class="h-9 px-5 bg-hyrox-green text-black font-semibold text-xs rounded-md hover:bg-[#d4ff00] transition-colors whitespace-nowrap">
+            Search
+          </button>
+        </div>
+      </details>
       <p class="text-zinc-600 text-[10px] mb-4" id="filters-status"></p>
 
       <!-- Search Status -->
@@ -665,11 +687,11 @@
     </div>
   </div>
 
-  <script src="js/data.js?v=12"></script>
-  <script src="js/workouts.js?v=12"></script>
-  <script src="js/auth.js?v=12"></script>
-  <script src="js/training-plan.js?v=12"></script>
-  <script src="js/onboarding.js?v=12"></script>
-  <script src="js/app.js?v=12"></script>
+  <script src="js/data.js?v=13"></script>
+  <script src="js/workouts.js?v=13"></script>
+  <script src="js/auth.js?v=13"></script>
+  <script src="js/training-plan.js?v=13"></script>
+  <script src="js/onboarding.js?v=13"></script>
+  <script src="js/app.js?v=13"></script>
 </body>
 </html>
