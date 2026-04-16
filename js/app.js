@@ -819,41 +819,61 @@ function clearUnifiedSearch() {
 
 async function fetchUnifiedAthletes(q) {
   try {
-    // Split query into first/last name heuristically
-    const parts = q.split(/\s+/);
-    const firstName = parts[0] || '';
-    const lastName = parts.slice(1).join(' ') || '';
+    const parts = q.split(/\s+/).filter(Boolean);
 
-    const params = new URLSearchParams();
-    if (firstName) params.set('first_name', firstName);
-    if (lastName) params.set('last_name', lastName);
+    // Build request list. For single word: query as firstname AND lastname in
+    // parallel (Hyrox backend distinguishes the two, so "Khatri" typed alone
+    // must hit search[name]=Khatri, not search[firstname]=Khatri).
+    const requests = [];
+    if (parts.length === 1) {
+      const p = new URLSearchParams({ first_name: parts[0] });
+      const l = new URLSearchParams({ last_name: parts[0] });
+      requests.push(fetch(`/api/search?${p}`));
+      requests.push(fetch(`/api/search?${l}`));
+    } else {
+      // Multi-word: first token is firstname, rest is lastname.
+      // Also try reversed (common for "Khatri Amit" style) as a second pass.
+      const first = parts[0];
+      const last = parts.slice(1).join(' ');
+      const p1 = new URLSearchParams({ first_name: first, last_name: last });
+      const p2 = new URLSearchParams({ first_name: last, last_name: first });
+      requests.push(fetch(`/api/search?${p1}`));
+      requests.push(fetch(`/api/search?${p2}`));
+    }
 
-    const resp = await fetch(`/api/search?${params}`);
-    if (!resp.ok) throw new Error('Search failed');
-    const data = await resp.json();
+    const responses = await Promise.allSettled(requests);
 
-    // Only render if query is still current (debounce guard)
+    // Debounce guard
     if (q !== unifiedSearchLastQuery) return;
 
-    // Group athletes by unique name, count races
+    // Merge athletes from all successful responses
     const athleteMap = {};
-    (data.athletes || []).forEach(a => {
-      const key = (a.name || '').toLowerCase().trim();
-      if (!key) return;
-      if (!athleteMap[key]) {
-        athleteMap[key] = {
-          name: a.name,
-          raceCount: 0,
-          firstResult: a,
-          results: [],
-        };
-      }
-      athleteMap[key].raceCount++;
-      athleteMap[key].results.push(a);
-    });
+    for (const r of responses) {
+      if (r.status !== 'fulfilled' || !r.value.ok) continue;
+      let data;
+      try { data = await r.value.json(); } catch { continue; }
+      (data.athletes || []).forEach(a => {
+        const key = (a.name || '').toLowerCase().trim();
+        if (!key) return;
+        if (!athleteMap[key]) {
+          athleteMap[key] = { name: a.name, raceCount: 0, firstResult: a, results: [] };
+        }
+        // Dedupe by detail_url so the same race from two queries isn't double-counted
+        const detailUrl = a.detail_url || '';
+        if (!athleteMap[key].results.some(x => (x.detail_url || '') === detailUrl)) {
+          athleteMap[key].raceCount++;
+          athleteMap[key].results.push(a);
+        }
+      });
+    }
 
     const athletes = Object.values(athleteMap).slice(0, 8);
-    renderUnifiedDropdown(q, athletes);
+
+    if (athletes.length === 0 && responses.every(r => r.status !== 'fulfilled' || !r.value.ok)) {
+      renderUnifiedDropdown(q, [], true);
+    } else {
+      renderUnifiedDropdown(q, athletes);
+    }
   } catch (err) {
     renderUnifiedDropdown(q, [], true);
   }
