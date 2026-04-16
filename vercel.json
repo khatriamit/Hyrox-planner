@@ -1,16 +1,9 @@
 {
-  "buildCommand": "",
-  "outputDirectory": ".",
-  "rewrites": [
-    { "source": "/api/search", "destination": "/api/search.py" },
-    { "source": "/api/athlete", "destination": "/api/athlete.py" },
-    { "source": "/api/filters", "destination": "/api/filters.py" },
-    { "source": "/api/garmin/auth", "destination": "/api/garmin/auth.py" },
-    { "source": "/api/garmin/activities", "destination": "/api/garmin/activities.py" },
-    { "source": "/api/strava/auth", "destination": "/api/strava/auth.py" },
-    { "source": "/api/strava/callback", "destination": "/api/strava/callback.py" },
-    { "source": "/api/strava/activities", "destination": "/api/strava/activities.py" }
-  ],
+  "functions": {
+    "api/**/*.py": {
+      "runtime": "@vercel/python@4.3.1"
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",
